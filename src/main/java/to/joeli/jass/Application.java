@@ -7,7 +7,13 @@ import to.joeli.jass.messages.type.SessionType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * Starts one bot in tournament mode. Add your own strategy to compete in the Jass Challenge Tournament 2017!
@@ -30,19 +36,52 @@ public class Application {
 
 
 	public static void main(String[] args) {
-		// Competition
+		logger.info("Arguments: {}", Arrays.toString(args));
 		String websocketUrl = parseWebsocketUrlOrDefault(args);
+
+		if (args.length > 1 && "human".equals(args[1])) {
+			logger.info("Human mode: starting 3 bots, leaving one slot for a human player.");
+			startHumanGame(websocketUrl);
+			return;
+		}
+
+		// Competition
 		String sessionName = parseSessionNameOrDefault(args);
 		Integer chosenTeamIndex = parseChosenTeamIndexOrDefault(args);
 		String advisedPlayerName = parseAdvisedPlayerNameOrDefault(args);
 		String botName = parseBotNameOrDefault(args);
-		logger.info("Arguments: {}", Arrays.toString(args));
 
 		logger.info("Connecting... Server socket URL: {}", websocketUrl);
 
 		Player player = new Player(botName, STRATEGY);
 
 		new RemoteGame(websocketUrl, player, SessionType.SINGLE_GAME, sessionName, chosenTeamIndex, advisedPlayerName).start();
+	}
+
+	private static void startHumanGame(String websocketUrl) {
+		ExecutorService executorService = Executors.newFixedThreadPool(3);
+		List<Future<?>> futures = new ArrayList<>();
+		// 1 bot on team 0 (human's partner), 2 bots on team 1 (opponents)
+		int[] teamIndices = {0, 1, 1};
+		for (int teamIndex : teamIndices) {
+			final int ti = teamIndex;
+			futures.add(executorService.submit(() -> {
+				new RemoteGame(websocketUrl, new Player(BOT_NAME, new JassTheRipperJassStrategy()), SessionType.SINGLE_GAME, "Java Client Session", ti, null).start();
+			}));
+			try {
+				Thread.sleep(500);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+			}
+		}
+		futures.forEach(f -> {
+			try {
+				f.get();
+			} catch (InterruptedException | ExecutionException e) {
+				e.printStackTrace();
+			}
+		});
+		executorService.shutdown();
 	}
 
 	private static String parseWebsocketUrlOrDefault(String[] args) {
