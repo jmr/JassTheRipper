@@ -60,12 +60,17 @@ public class Arena {
 	}
 
 	public Arena(double improvementThresholdPercentage, int seed) {
+		this(improvementThresholdPercentage, seed, true);
+	}
+
+	public Arena(double improvementThresholdPercentage, int seed, boolean runSetUp) {
 		// CudaEnvironment.getInstance().getConfiguration().allowMultiGPU(true); // NOTE: This might have to be enabled on the server
 
 		this.improvementThresholdPercentage = improvementThresholdPercentage;
 		random = new Random(seed);
 
-		setUp();
+		if (runSetUp) setUp();
+		else gameSession = GameSessionBuilder.newSession().createGameSession();
 	}
 
 	public Arena(GameSession gameSession) {
@@ -349,7 +354,7 @@ public class Arena {
 				gameSession.makeMove(move);
 				player.onMoveMade(move);
 
-				if (savingData) {
+				if (savingData && !game.getCurrentPlayer().getCards().isEmpty()) {
 					final Map<Card, Distribution> cardKnowledge = CardKnowledgeBase.initCardKnowledge(game, game.getCurrentPlayer().getCards());
 					if (DATA_AUGMENTATION_ENABLED) {
 						// INFO: Because the permutations are always in the same order we can just add the analogous features and targets. They
@@ -369,7 +374,7 @@ public class Arena {
 		}
 
 		if (savingData) {
-			if (scoreFeaturesForPlayer.size() != computeDataSetSize()) throw new AssertionError();
+			if (scoreFeaturesForPlayer.size() > computeDataSetSize()) throw new AssertionError();
 			for (Map.Entry<float[][], Player> entry : scoreFeaturesForPlayer.entrySet()) {
 				scoreDataSet.addFeature(entry.getKey());
 				scoreDataSet.addTarget(NeuralNetworkHelper.getScoreTarget(game, entry.getValue()));

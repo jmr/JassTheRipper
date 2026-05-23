@@ -20,13 +20,12 @@ import to.joeli.jass.client.strategy.training.networks.ScoreEstimator;
 import static org.junit.Assert.assertTrue;
 import static to.joeli.jass.client.strategy.training.Arena.IMPROVEMENT_THRESHOLD_PERCENTAGE;
 
-@Ignore("These tests are benchmarks and do not have to be run every time. They take a lot of time as well.")
 public class MCTSBenchmarkTest {
 
 	private static final long SEED = 43; // To get a match at the start use 42
 	private static final int NUM_GAMES = 50;
 
-	private Arena arena = new Arena(IMPROVEMENT_THRESHOLD_PERCENTAGE, Arena.SEED);
+	private Arena arena = new Arena(IMPROVEMENT_THRESHOLD_PERCENTAGE, Arena.SEED, false);
 
 
 	/**
