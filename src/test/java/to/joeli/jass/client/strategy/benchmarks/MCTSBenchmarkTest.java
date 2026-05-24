@@ -50,10 +50,36 @@ public class MCTSBenchmarkTest {
 	}
 
 	/**
-	 * Tests if it is worthwhile to use more search time
+	 * Tests if it is worthwhile to use more search time (100ms vs 500ms)
 	 */
 	@Test
 	public void testHigherCardStrengthLevelTimeIsWorthwhile() {
+		Config[] configs = {
+				new Config(true, false, false),
+				new Config(true, false, false)
+		};
+		configs[0].setMctsConfig(new MCTSConfig(StrengthLevel.TEST_100_MS));
+		configs[1].setMctsConfig(new MCTSConfig(StrengthLevel.TEST_500_MS));
+
+		final double performance = arena.runMatchWithConfigs(configs);
+
+		System.out.println(performance);
+		assertTrue(performance > 100);
+
+		// 20 games
+		// 100 vs 500 -> 106.58% (1620 vs 1520)
+		// 100 vs 500 -> 100.51% (1574 vs 1566)
+		// 100 vs 500 -> 111.90% (1711 vs 1529)
+		// 100 vs 500 -> 96.50% (1542 vs 1598)
+		// 100 vs 500 -> 99.75% (1568 vs 1572)
+	}
+
+
+	/**
+	 * Tests if it is worthwhile to use more search time (1000ms vs 500ms)
+	 */
+	@Test
+	public void test1000msVs500ms() {
 		Config[] configs = {
 				new Config(true, false, false),
 				new Config(true, false, false)
@@ -65,15 +91,7 @@ public class MCTSBenchmarkTest {
 
 		System.out.println(performance);
 		assertTrue(performance > 100);
-
-		// 20 games
-		// 1000 vs 500 -> 106.58% (1620 vs 1520)
-		// 1000 vs 500 -> 100.51% (1574 vs 1566)
-		// 1000 vs 500 -> 111.90% (1711 vs 1529)
-		// 1000 vs 500 -> 96.50% (1542 vs 1598)
-		// 1000 vs 500 -> 99.75% (1568 vs 1572)
 	}
-
 
 	/**
 	 * Tests if it is worthwhile to use more determinizations
