@@ -210,11 +210,16 @@ public class Arena {
 	}
 
 	public double runMatchWithConfigs(Config[] configs) {
+		return runMatchWithConfigs(configs, NUM_EVALUATION_GAMES);
+	}
+
+	public double runMatchWithConfigs(Config[] configs, int numGames) {
 		resultLogger.info("{}", configs[0]);
 		resultLogger.info("{}", configs[1]);
-		resultLogger.info("Number of evaluation games: {}", NUM_EVALUATION_GAMES);
-		resultLogger.info("Number of double games: {}", NUM_EVALUATION_GAMES / 2);
-		return performMatch(TrainMode.EVALUATION, -1, configs);
+		resultLogger.info("Number of evaluation games: {}", numGames);
+		resultLogger.info("Number of double games: {}", numGames / 2);
+		gameSession.setConfigs(configs);
+		return playGames(numGames, TrainMode.EVALUATION, null, -1);
 	}
 
 	private double runOnlyNetworks() {
