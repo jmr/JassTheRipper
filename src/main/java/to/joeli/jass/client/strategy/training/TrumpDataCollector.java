@@ -7,10 +7,13 @@ import to.joeli.jass.client.strategy.config.Config;
 import to.joeli.jass.client.strategy.helpers.GameSessionBuilder;
 import to.joeli.jass.client.strategy.helpers.TrumpfSelectionHelper;
 import to.joeli.jass.game.cards.Card;
-import to.joeli.jass.game.cards.CardValue;
 import to.joeli.jass.game.cards.Color;
 import to.joeli.jass.game.mode.Mode;
 
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.EnumSet;
 import java.util.stream.Collectors;
@@ -19,39 +22,44 @@ import java.util.stream.Collectors;
  * Generates trump-selection training data by playing out games under each of the
  * heuristic's top-3 trump candidates and recording which one actually scored best.
  *
- * Output (via "TrumpData" logger → trump_data.csv):
+ * Output: CSV written directly to the path supplied at construction time.
  *   deal_id, hand card flags (36 binary), suit counts (4), top-3 modes with heuristic
  *   scores, actual team scores for each mode, winner index (0=heuristic #1 was best).
  */
 public class TrumpDataCollector {
 
-    public static final Logger dataLogger = LoggerFactory.getLogger("TrumpData");
     private static final Logger logger = LoggerFactory.getLogger(TrumpDataCollector.class);
 
+    private final String outputPath;
     private final GameSession gameSession;
     private final Random random;
 
-    public TrumpDataCollector(Config cardConfig, long seed) {
+    public TrumpDataCollector(Config cardConfig, long seed, String outputPath) {
+        this.outputPath = outputPath;
         gameSession = GameSessionBuilder.newSession().createGameSession();
         gameSession.setConfigs(new Config[]{cardConfig, cardConfig});
         random = new Random(seed);
     }
 
     public void collect(int numDeals) {
-        dataLogger.info(csvHeader());
-        List<Card> cards = new ArrayList<>(Arrays.asList(Card.values()));
-        for (int i = 0; i < numDeals; i++) {
-            Collections.shuffle(cards, random);
-            try {
-                collectDeal(i, new ArrayList<>(cards));
-            } catch (Exception e) {
-                logger.warn("Skipping deal {}: {}", i, e.getMessage());
+        try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(Paths.get(outputPath)))) {
+            out.println(csvHeader());
+            List<Card> cards = new ArrayList<>(Arrays.asList(Card.values()));
+            for (int i = 0; i < numDeals; i++) {
+                Collections.shuffle(cards, random);
+                try {
+                    collectDeal(i, new ArrayList<>(cards), out);
+                } catch (Exception e) {
+                    logger.warn("Skipping deal {}: {}", i, e.getMessage());
+                }
             }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to write " + outputPath, e);
         }
         gameSession.resetResult();
     }
 
-    private void collectDeal(int dealId, List<Card> cards) {
+    private void collectDeal(int dealId, List<Card> cards, PrintWriter out) {
         gameSession.dealCards(cards);
         Player selector = gameSession.getTrumpfSelectingPlayer();
         Set<Card> hand = EnumSet.copyOf(selector.getCards()); // snapshot before games modify the hand
@@ -68,7 +76,7 @@ public class TrumpDataCollector {
             scores[i] = playGameWithMode(cards, top3.get(i).getKey(), selector);
 
         int winner = indexOfMax(scores);
-        dataLogger.info(formatRow(dealId, hand, top3, scores, winner));
+        out.println(formatRow(dealId, hand, top3, scores, winner));
         gameSession.resetResult();
     }
 

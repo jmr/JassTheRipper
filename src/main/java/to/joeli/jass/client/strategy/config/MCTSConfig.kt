@@ -22,6 +22,7 @@ class MCTSConfig {
     var finalSelectionPolicy = FinalSelectionPolicy.ROBUST_CHILD
     var heuristicFunction: HeuristicFunction? = null
     var playoutSelectionPolicy: PlayoutSelectionPolicy? = null
+    var trumpfNumCandidates = 3 // how many heuristic-ranked modes the trump MCTS considers
 
     constructor() {
         // Different settings on local machine for faster testing

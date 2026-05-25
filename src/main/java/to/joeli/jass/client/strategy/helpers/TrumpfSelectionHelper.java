@@ -67,21 +67,14 @@ public class TrumpfSelectionHelper {
 	 * @return
 	 */
 	public static List<Mode> getTopTrumpfChoices(Set<Card> availableCards, boolean isGschobe) {
-		final LinkedHashMap<Mode, Integer> trumpfRatings = rateModes(availableCards, isGschobe);
-		//return getTrumpfsAboveThreshold(trumpfRatings);
-		return getTopNumTrumpfs(trumpfRatings);
+		return getTopTrumpfChoices(availableCards, isGschobe, TOP_NUM_TRUMPFS);
 	}
 
-	/**
-	 * Returns the TOP_NUM_TRUMPFS rated trumpfs
-	 *
-	 * @param trumpfRatings
-	 * @return
-	 */
-	@NotNull
-	private static List<Mode> getTopNumTrumpfs(LinkedHashMap<Mode, Integer> trumpfRatings) {
+	public static List<Mode> getTopTrumpfChoices(Set<Card> availableCards, boolean isGschobe, int n) {
+		final LinkedHashMap<Mode, Integer> trumpfRatings = rateModes(availableCards, isGschobe);
+		//return getTrumpfsAboveThreshold(trumpfRatings);
 		return trumpfRatings.entrySet().stream()
-				.limit(TOP_NUM_TRUMPFS)
+				.limit(n)
 				.map(Map.Entry::getKey)
 				.collect(Collectors.toList());
 	}

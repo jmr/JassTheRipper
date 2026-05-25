@@ -154,6 +154,19 @@ TODO Make new experiments with the improvements so far:
 					logger.error("Something went wrong. Had to choose random trumpf, damn it!");
 				}
 
+			if (config.getTrumpfSelectionMethod() == TrumpfSelectionMethod.MCTS_BEFORE_SHIFT)
+				if (!shifted)
+					try {
+						if (mctsHelper == null) throw new AssertionError();
+						Move move = mctsHelper.predictMove(availableCards, session, true, shifted);
+						mode = ((TrumpfMove) move).getChosenTrumpf();
+					} catch (MCTSException e) {
+						logger.error("{}", e);
+						mode = TrumpfSelectionHelper.predictTrumpf(availableCards, shifted);
+					}
+				else
+					mode = TrumpfSelectionHelper.predictTrumpf(availableCards, shifted);
+
 			if (config.getTrumpfSelectionMethod() == TrumpfSelectionMethod.MCTS_ON_SHIFT)
 				if (shifted)
 					try {

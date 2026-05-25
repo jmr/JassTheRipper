@@ -42,6 +42,27 @@ public class UCBBenchmarkTest {
     }
 
     @Test
+    public void mctsBeforeShiftVsRuleBased() {
+        Arena arena = new Arena(IMPROVEMENT_THRESHOLD_PERCENTAGE, Arena.SEED, false);
+
+        MCTSConfig mctsConfig = new MCTSConfig();
+        mctsConfig.setCardStrengthLevel(StrengthLevel.EXTREME);
+        mctsConfig.setTrumpfStrengthLevel(StrengthLevel.IRONMAN);
+        mctsConfig.setTrumpfNumCandidates(2);
+
+        MCTSConfig ruleConfig = new MCTSConfig();
+        ruleConfig.setCardStrengthLevel(StrengthLevel.EXTREME);
+
+        Config[] configs = {
+                new Config(mctsConfig, TrumpfSelectionMethod.MCTS_BEFORE_SHIFT),
+                new Config(ruleConfig)
+        };
+
+        double result = arena.runMatchWithConfigs(configs, 60);
+        Arena.resultLogger.info("MCTS_BEFORE_SHIFT scored {}% of RULE_BASED points (>100 means MCTS_BEFORE_SHIFT wins)", result);
+    }
+
+    @Test
     public void halfHeuristicVsRuleBased() {
         Arena arena = new Arena(IMPROVEMENT_THRESHOLD_PERCENTAGE, Arena.SEED, false);
 

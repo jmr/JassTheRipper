@@ -19,13 +19,13 @@ public class TrumpDataCollectionTest {
     public void collectFast() {
         MCTSConfig cfg = new MCTSConfig();
         cfg.setCardStrengthLevel(StrengthLevel.FAST);
-        new TrumpDataCollector(new Config(cfg), 42).collect(100);
+        new TrumpDataCollector(new Config(cfg), 42, "src/main/resources/trump_data_fast.csv").collect(100);
     }
 
     @Test
     public void collectExtreme() {
         MCTSConfig cfg = new MCTSConfig();
         cfg.setCardStrengthLevel(StrengthLevel.EXTREME);
-        new TrumpDataCollector(new Config(cfg), 42).collect(150);
+        new TrumpDataCollector(new Config(cfg), 42, "src/main/resources/trump_data_extreme.csv").collect(150);
     }
 }

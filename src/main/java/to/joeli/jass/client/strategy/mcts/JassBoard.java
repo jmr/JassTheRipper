@@ -38,6 +38,7 @@ public class JassBoard implements Board {
 	private Game game;
 	private boolean cheating; // Determines if the player knows the cards of the other players or not (used for experiments)
 	private boolean hardPruningEnabled; // Determines if the player knows the cards of the other players or not (used for experiments)
+	private int trumpfNumCandidates = TrumpfSelectionHelper.TOP_NUM_TRUMPFS;
 
 	// The neural network of the player choosing the move at the beginning. If null -> use random playout instead
 	private final ScoreEstimator scoreEstimator;
@@ -70,7 +71,12 @@ public class JassBoard implements Board {
 	 * @return
 	 */
 	public static JassBoard constructTrumpfSelectionJassBoard(Set<Card> availableCards, GameSession gameSession, boolean shifted, boolean cheating, boolean hardPruningEnabled, ScoreEstimator scoreEstimator, CardsEstimator cardsEstimator) {
+		return constructTrumpfSelectionJassBoard(availableCards, gameSession, shifted, cheating, hardPruningEnabled, scoreEstimator, cardsEstimator, TrumpfSelectionHelper.TOP_NUM_TRUMPFS);
+	}
+
+	public static JassBoard constructTrumpfSelectionJassBoard(Set<Card> availableCards, GameSession gameSession, boolean shifted, boolean cheating, boolean hardPruningEnabled, ScoreEstimator scoreEstimator, CardsEstimator cardsEstimator, int trumpfNumCandidates) {
 		JassBoard jassBoard = new JassBoard(EnumSet.copyOf(availableCards), new GameSession(gameSession), shifted, null, cheating, hardPruningEnabled, scoreEstimator, cardsEstimator);
+		jassBoard.trumpfNumCandidates = trumpfNumCandidates;
 		jassBoard.sampleCardDeterminizationToPlayersInTrumpfSelection();
 		return jassBoard;
 	}
@@ -147,7 +153,7 @@ public class JassBoard implements Board {
 	@Override
 	public Board duplicate(boolean newRandomCards) {
 		if (isChoosingTrumpf())
-			return constructTrumpfSelectionJassBoard(availableCards, gameSession, shifted, cheating, hardPruningEnabled, scoreEstimator, cardsEstimator);
+			return constructTrumpfSelectionJassBoard(availableCards, gameSession, shifted, cheating, hardPruningEnabled, scoreEstimator, cardsEstimator, trumpfNumCandidates);
 
 		JassBoard jassBoard = constructCardSelectionJassBoard(availableCards, game, cheating, hardPruningEnabled, scoreEstimator, cardsEstimator);
 		if (newRandomCards)
@@ -169,7 +175,7 @@ public class JassBoard implements Board {
 
 		if (isChoosingTrumpf()) {
 			// INFO: This performs pruning: removes all the trumpfs which are obviously bad, so that more time can be spent on the good trumpfs
-			List<Mode> topTrumpfChoices = TrumpfSelectionHelper.getTopTrumpfChoices(player.getCards(), shifted);
+			List<Mode> topTrumpfChoices = TrumpfSelectionHelper.getTopTrumpfChoices(player.getCards(), shifted, trumpfNumCandidates);
 
 			for (Mode mode : topTrumpfChoices)
 				moves.add(new TrumpfMove(player, mode));

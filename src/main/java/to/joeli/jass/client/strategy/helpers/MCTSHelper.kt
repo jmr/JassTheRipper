@@ -73,7 +73,7 @@ class MCTSHelper(private val mctsConfig: MCTSConfig) {
             strengthLevel = mctsConfig.trumpfStrengthLevel
             scoreEstimator = gameSession.trumpfSelectingPlayer.scoreEstimator
             cardsEstimator = gameSession.trumpfSelectingPlayer.cardsEstimator
-            jassBoard = JassBoard.constructTrumpfSelectionJassBoard(availableCards, gameSession, shifted, mctsConfig.cheating, mctsConfig.hardPruningEnabled, scoreEstimator, cardsEstimator)
+            jassBoard = JassBoard.constructTrumpfSelectionJassBoard(availableCards, gameSession, shifted, mctsConfig.cheating, mctsConfig.hardPruningEnabled, scoreEstimator, cardsEstimator, mctsConfig.trumpfNumCandidates)
         } else {
             strengthLevel = mctsConfig.cardStrengthLevel
             scoreEstimator = gameSession.currentGame.currentPlayer.scoreEstimator

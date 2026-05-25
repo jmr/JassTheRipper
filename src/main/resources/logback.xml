@@ -30,18 +30,7 @@
         <appender-ref ref="RESULT" />
     </logger>
 
-    <appender name="TRUMPDATA" class="ch.qos.logback.core.FileAppender">
-        <file>${LOG_DIR}/trump_data.csv</file>
-        <append>false</append>
-        <encoder>
-            <pattern>%msg%n</pattern>
-        </encoder>
-    </appender>
-    <logger name="TrumpData" level="DEBUG" additivity="false">
-        <appender-ref ref="TRUMPDATA" />
-    </logger>
-
-    <logger name="to.joeli" level="INFO" />
+<logger name="to.joeli" level="INFO" />
     <logger name="to.joeli.jass.client.strategy.training.Arena" level="INFO" />
 
     <root level="INFO">
