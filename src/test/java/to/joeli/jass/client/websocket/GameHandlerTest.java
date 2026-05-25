@@ -25,7 +25,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.*;
-import static org.mockito.Matchers.any;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 public class GameHandlerTest {
@@ -178,7 +178,7 @@ public class GameHandlerTest {
 
 		handler.onPlayedCards(Collections.singletonList(new RemoteCard(13, CLUBS)));
 
-		verify(session).makeMove(argThat(sameBeanAs(new Move(new Player("Player0"), Card.CLUB_KING))));
+		verify(session).makeMove(argThat(move -> sameBeanAs(new Move(new Player("Player0"), Card.CLUB_KING)).matches(move)));
 	}
 
 	@Test
@@ -279,7 +279,7 @@ public class GameHandlerTest {
 
 		verify(localPlayer, times(1)).setId(null);
 		verifyNoMoreInteractions(localPlayer);
-		verifyZeroInteractions(gameSession);
+		verifyNoInteractions(gameSession);
 	}
 
 
@@ -293,7 +293,7 @@ public class GameHandlerTest {
 		gameHandler.onBroadCastTrumpf(new TrumpfChoice(Trumpf.OBEABE, null));
 
 		verify(localPlayer, times(1)).onGameStarted(gameSession);
-		verify(gameSession, times(1)).startNewGame(anyObject(), eq(true));
+		verify(gameSession, times(1)).startNewGame(any(), eq(true));
 	}
 
 }
