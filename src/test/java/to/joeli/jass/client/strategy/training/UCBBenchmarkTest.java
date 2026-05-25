@@ -4,6 +4,7 @@ import org.junit.Test;
 import to.joeli.jass.client.strategy.config.Config;
 import to.joeli.jass.client.strategy.config.MCTSConfig;
 import to.joeli.jass.client.strategy.config.StrengthLevel;
+import to.joeli.jass.client.strategy.config.TrumpfSelectionMethod;
 
 import static to.joeli.jass.client.strategy.training.Arena.IMPROVEMENT_THRESHOLD_PERCENTAGE;
 
@@ -33,9 +34,32 @@ public class UCBBenchmarkTest {
         c10000Config.setCardStrengthLevel(StrengthLevel.EXTREME);
 
         double result1k = arena.runMatchWithConfigs(new Config[]{new Config(c1000Config), new Config(sqrt2Config)}, 10);
+
         Arena.resultLogger.info("c=1000 scored {}% of sqrt(2) points (>100 means c=1000 wins)", result1k);
 
         double result10k = arena.runMatchWithConfigs(new Config[]{new Config(c10000Config), new Config(sqrt2Config)}, 10);
         Arena.resultLogger.info("c=10000 scored {}% of sqrt(2) points (>100 means c=10000 wins)", result10k);
+    }
+
+    @Test
+    public void halfHeuristicVsRuleBased() {
+        Arena arena = new Arena(IMPROVEMENT_THRESHOLD_PERCENTAGE, Arena.SEED, false);
+
+        // Team A: MCTS_ON_SHIFT — rule-based initial, MCTS IRONMAN (10s) when geschoben
+        MCTSConfig halfConfig = new MCTSConfig();
+        halfConfig.setCardStrengthLevel(StrengthLevel.EXTREME);
+        halfConfig.setTrumpfStrengthLevel(StrengthLevel.IRONMAN);
+
+        // Team B: pure rule-based trump selection
+        MCTSConfig ruleConfig = new MCTSConfig();
+        ruleConfig.setCardStrengthLevel(StrengthLevel.EXTREME);
+
+        Config[] configs = {
+                new Config(halfConfig, TrumpfSelectionMethod.MCTS_ON_SHIFT),
+                new Config(ruleConfig)
+        };
+
+        double result = arena.runMatchWithConfigs(configs, 30);
+        Arena.resultLogger.info("MCTS_ON_SHIFT scored {}% of RULE_BASED points (>100 means MCTS_ON_SHIFT wins)", result);
     }
 }

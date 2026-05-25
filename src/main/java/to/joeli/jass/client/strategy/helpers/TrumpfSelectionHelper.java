@@ -55,6 +55,10 @@ public class TrumpfSelectionHelper {
 		return trumpfRatings.entrySet().iterator().next().getKey();
 	}
 
+	public static LinkedHashMap<Mode, Integer> rateAll(Set<Card> availableCards, boolean isGschobe) {
+		return rateModes(availableCards, isGschobe);
+	}
+
 	/**
 	 * Can be used for pruning.
 	 *
