@@ -59,7 +59,7 @@ public class UCBBenchmarkTest {
                 new Config(ruleConfig)
         };
 
-        double result = arena.runMatchWithConfigs(configs, 30);
+        double result = arena.runMatchWithConfigs(configs, 60);
         Arena.resultLogger.info("MCTS_ON_SHIFT scored {}% of RULE_BASED points (>100 means MCTS_ON_SHIFT wins)", result);
     }
 }

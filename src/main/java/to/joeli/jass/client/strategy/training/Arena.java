@@ -293,6 +293,7 @@ public class Arena {
 
 		resultLogger.info("Team1,Team2");
 		Result firstResult = null;
+		List<Double> pairDiffs = new ArrayList<>();
 		for (int i = 1; i <= numGames; i++) {
 			logger.info("Running game #{}\n", i);
 
@@ -311,8 +312,10 @@ public class Arena {
 			if (firstResult == null)
 				firstResult = result;
 			else {
-				resultLogger.info("{},{}", result.getTeamAScore().getScore() + firstResult.getTeamAScore().getScore(),
-						result.getTeamBScore().getScore() + firstResult.getTeamBScore().getScore());
+				int pairA = result.getTeamAScore().getScore() + firstResult.getTeamAScore().getScore();
+				int pairB = result.getTeamBScore().getScore() + firstResult.getTeamBScore().getScore();
+				resultLogger.info("{},{}", pairA, pairB);
+				pairDiffs.add((double) (pairA - pairB));
 				firstResult = null;
 			}
 
@@ -325,10 +328,102 @@ public class Arena {
 		double improvement = Math.round(10000.0 * result.getTeamAScore().getScore() / result.getTeamBScore().getScore()) / 100.0;
 		logger.info("Team A scored {}% of the points of Team B\n", improvement);
 
+		if (!pairDiffs.isEmpty())
+			printStats(pairDiffs);
+
 		logger.info("Resetting the result so we can get a fresh start afterwards\n");
 		gameSession.resetResult();
 
 		return improvement;
+	}
+
+	private static void printStats(List<Double> diffs) {
+		int n = diffs.size();
+		double mean = diffs.stream().mapToDouble(Double::doubleValue).average().orElse(0);
+		double variance = diffs.stream().mapToDouble(d -> (d - mean) * (d - mean)).sum() / (n - 1);
+		double se = Math.sqrt(variance / n);
+		double t = se == 0 ? Double.NaN : mean / se;
+		int df = n - 1;
+		double tP = Double.isNaN(t) ? Double.NaN : tTestTwoSidedP(t, df);
+
+		long wins = diffs.stream().filter(d -> d > 0).count();
+		long losses = n - wins; // ties impossible: total Jass points are always 157 (odd)
+		double signP = signTestTwoSidedP(wins, n);
+
+		resultLogger.info("--- Stats ({} pairs) ---", n);
+		resultLogger.info(String.format("Paired t-test: mean_diff=%.1f  sd=%.1f  t=%.3f  df=%d  p=%.4f", mean, Math.sqrt(variance), t, df, tP));
+		resultLogger.info(String.format("Sign test:     wins=%d  losses=%d  p=%.4f", wins, losses, signP));
+	}
+
+	// Two-sided p-value for a paired t-test: P(|T| >= |t|) under H0
+	private static double tTestTwoSidedP(double t, int df) {
+		double x = (double) df / (df + t * t);
+		return regularizedIncompleteBeta(df / 2.0, 0.5, x);
+	}
+
+	// Two-sided binomial sign test: P(X >= wins or X <= losses) under H0: p=0.5, X~Bin(nEff, 0.5)
+	private static double signTestTwoSidedP(long wins, long nEff) {
+		long k = Math.max(wins, nEff - wins);
+		double tail = 0;
+		for (long i = k; i <= nEff; i++)
+			tail += Math.exp(logBinomCoef(nEff, i) + nEff * Math.log(0.5));
+		return Math.min(1.0, 2 * tail);
+	}
+
+	private static double logBinomCoef(long n, long k) {
+		if (k == 0 || k == n) return 0;
+		return lgamma(n + 1) - lgamma(k + 1) - lgamma(n - k + 1);
+	}
+
+	// Numerical helpers below (Lanczos lgamma + Lentz CF for incomplete beta).
+	// Alternative: replace with commons-math3 TDistribution / BinomialDistribution — cleaner but adds ~1 MB dep.
+
+	// Regularized incomplete beta I_x(a,b) via Lentz continued fraction
+	private static double regularizedIncompleteBeta(double a, double b, double x) {
+		if (x <= 0) return 0;
+		if (x >= 1) return 1;
+		if (x > (a + 1) / (a + b + 2))
+			return 1 - regularizedIncompleteBeta(b, a, 1 - x);
+		double logBeta = lgamma(a) + lgamma(b) - lgamma(a + b);
+		double front = Math.exp(a * Math.log(x) + b * Math.log(1 - x) - logBeta) / a;
+		return front * betaContinuedFraction(a, b, x);
+	}
+
+	private static double betaContinuedFraction(double a, double b, double x) {
+		final double FPMIN = 1e-30;
+		double qab = a + b, qap = a + 1, qam = a - 1;
+		double c = 1, d = 1 - qab * x / qap;
+		if (Math.abs(d) < FPMIN) d = FPMIN;
+		d = 1 / d;
+		double h = d;
+		for (int m = 1; m <= 200; m++) {
+			int m2 = 2 * m;
+			double aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+			d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN;
+			c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN;
+			d = 1 / d; h *= d * c;
+			aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+			d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN;
+			c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN;
+			d = 1 / d;
+			double del = d * c; h *= del;
+			if (Math.abs(del - 1) < 3e-7) break;
+		}
+		return h;
+	}
+
+	// Lanczos log-gamma, accurate to ~15 significant digits for x > 0
+	private static double lgamma(double x) {
+		double[] c = {0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+				771.32342877765313, -176.61502916214059, 12.507343278686905,
+				-0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7};
+		if (x < 0.5)
+			return Math.log(Math.PI / Math.sin(Math.PI * x)) - lgamma(1 - x);
+		x -= 1;
+		double a = c[0];
+		for (int i = 1; i < c.length; i++) a += c[i] / (x + i);
+		double t = x + 7.5;
+		return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a);
 	}
 
 	/**
