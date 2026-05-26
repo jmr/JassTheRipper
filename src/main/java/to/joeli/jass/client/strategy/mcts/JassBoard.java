@@ -106,7 +106,7 @@ public class JassBoard implements Board {
 
 	void sampleCardDeterminizationToPlayersInTrumpfSelection() {
 		if (!cheating) // if cheating: do nothing -> all the cards are known
-			CardKnowledgeBase.sampleCardDeterminizationToPlayers(this.gameSession, this.availableCards);
+			CardKnowledgeBase.sampleCardDeterminizationToPlayers(this.gameSession, this.availableCards, this.shifted);
 		else
 			try {
 				Thread.sleep(1); // to make comparison fairer

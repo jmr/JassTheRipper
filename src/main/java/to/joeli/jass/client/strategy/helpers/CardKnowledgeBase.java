@@ -29,24 +29,72 @@ public class CardKnowledgeBase {
 	 * Distribute the unknown cards to the other players at the beginning of the game, when a player is choosing a trumpf.
 	 * IMPORTANT: To be used before the game started, during trumpf selection!
 	 *
-	 * @param availableCards
+	 * When shifted=true the current player is the partner of the original selector. The original selector
+	 * revealed a weak hand by shifting, so we rejection-sample their cards until the sampled hand would
+	 * also shift according to the heuristic. This makes determinizations realistic after a pass.
+	 *
 	 * @param gameSession
+	 * @param availableCards cards held by the player who is now choosing trump
+	 * @param shifted        whether the original selector already passed
 	 */
-	public static void sampleCardDeterminizationToPlayers(GameSession gameSession, Set<Card> availableCards) {
-		Player currentPlayer = gameSession.getTrumpfSelectingPlayer();
+	public static void sampleCardDeterminizationToPlayers(GameSession gameSession, Set<Card> availableCards, boolean shifted) {
+		Player currentPlayer = shifted
+				? gameSession.getPartnerOfPlayer(gameSession.getTrumpfSelectingPlayer())
+				: gameSession.getTrumpfSelectingPlayer();
 		currentPlayer.setCards(EnumSet.copyOf(availableCards));
+
+		Player originalSelector = gameSession.getTrumpfSelectingPlayer();
 
 		Set<Card> remainingCards = EnumSet.allOf(Card.class);
 		remainingCards.removeAll(availableCards);
 		if (remainingCards.isEmpty()) throw new AssertionError();
+
+		List<Player> others = new ArrayList<>();
 		for (Player player : gameSession.getPlayersInInitialPlayingOrder())
-			if (!player.equals(currentPlayer)) {
+			if (!player.equals(currentPlayer))
+				others.add(player);
+
+		if (shifted) {
+			// Assign the two non-selector, non-current players first (no constraint on them).
+			Set<Card> pool = EnumSet.copyOf(remainingCards);
+			for (Player player : others) {
+				if (player.equals(originalSelector)) continue;
+				Set<Card> cards = pickRandomSubSet(pool, 9);
+				player.setCards(cards);
+				pool.removeAll(cards);
+			}
+			// pool now has exactly 9 cards for the original selector; reject if too strong.
+			// Retry the whole assignment up to MAX_REJECTION_ATTEMPTS times.
+			for (int attempt = 0; attempt < MAX_REJECTION_ATTEMPTS; attempt++) {
+				if (TrumpfSelectionHelper.wouldShift(pool)) break;
+				// Re-draw all three non-current players together and re-split.
+				pool = EnumSet.copyOf(remainingCards);
+				for (Player player : others) {
+					if (player.equals(originalSelector)) continue;
+					Set<Card> cards = pickRandomSubSet(pool, 9);
+					player.setCards(cards);
+					pool.removeAll(cards);
+				}
+			}
+			originalSelector.setCards(pool);
+		} else {
+			for (Player player : others) {
 				Set<Card> cards = pickRandomSubSet(remainingCards, 9);
 				player.setCards(cards);
 				remainingCards.removeAll(cards);
 			}
-		if (!remainingCards.isEmpty()) throw new AssertionError();
+		}
+
+		for (Player player : gameSession.getPlayersInInitialPlayingOrder())
+			if (player.getCards().isEmpty()) throw new AssertionError("Player " + player + " has no cards after determinization");
 	}
+
+	/** Backward-compatible overload for the non-shifted case. */
+	public static void sampleCardDeterminizationToPlayers(GameSession gameSession, Set<Card> availableCards) {
+		sampleCardDeterminizationToPlayers(gameSession, availableCards, false);
+	}
+
+	private static final int MAX_REJECTION_ATTEMPTS = 20;
 
 
 	/**

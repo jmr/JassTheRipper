@@ -59,6 +59,15 @@ public class TrumpfSelectionHelper {
 		return rateModes(availableCards, isGschobe);
 	}
 
+	/** Returns true if the heuristic would shift with this hand (best non-shift mode < threshold). */
+	public static boolean wouldShift(Set<Card> availableCards) {
+		return rateModes(availableCards, false).entrySet().stream()
+				.filter(e -> !e.getKey().equals(Mode.shift()))
+				.mapToInt(Map.Entry::getValue)
+				.max()
+				.orElse(0) < MAX_SHIFT_RATING_VAL;
+	}
+
 	/**
 	 * Can be used for pruning.
 	 *
