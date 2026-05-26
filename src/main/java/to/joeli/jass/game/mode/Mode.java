@@ -94,7 +94,7 @@ public abstract class Mode {
 
 
 	public Card determineWinningCard(List<Card> cards) {
-		return GeneralRules.determineWinnerCard(cards, createRankComparator(), Optional.ofNullable(getTrumpfColor())).orElse(null);
+		return GeneralRules.determineWinnerCard(cards, createRankComparator(), getTrumpfColor());
 	}
 
 	public Move determineWinningMove(List<Move> moves) {

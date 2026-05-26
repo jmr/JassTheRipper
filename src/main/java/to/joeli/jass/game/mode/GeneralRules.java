@@ -5,9 +5,7 @@ import to.joeli.jass.game.cards.Color;
 
 import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
-import java.util.function.Predicate;
 
 class GeneralRules {
 
@@ -24,18 +22,17 @@ class GeneralRules {
 	}
 
 
-	public static Optional<Card> determineWinnerCard(List<Card> cards, Comparator<Card> cardRankComparator, Optional<Color> trumpfColor) {
-		if (cards == null || cards.isEmpty()) {
-			return Optional.empty();
-		}
+	public static Card determineWinnerCard(List<Card> cards, Comparator<Card> cardRankComparator, Color trumpfColor) {
+		if (cards == null || cards.isEmpty()) return null;
 		final Color firstCardColor = cards.get(0).getColor();
-		// TODO to optimize performance replace this stream with for loop
-		return cards.stream()
-				.filter(allCardsWithColorOrTrumpfColor(firstCardColor, trumpfColor))
-				.max(cardRankComparator);
-	}
-
-	private static Predicate<Card> allCardsWithColorOrTrumpfColor(Color firstCardColor, Optional<Color> trumpfColor) {
-		return card -> card.getColor() == trumpfColor.orElse(firstCardColor) || card.getColor() == firstCardColor;
+		Card winner = null;
+		for (Card card : cards) {
+			Color c = card.getColor();
+			if (c == firstCardColor || c == trumpfColor) {
+				if (winner == null || cardRankComparator.compare(card, winner) > 0)
+					winner = card;
+			}
+		}
+		return winner;
 	}
 }
