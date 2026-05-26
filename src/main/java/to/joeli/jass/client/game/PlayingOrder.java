@@ -14,7 +14,10 @@ public class PlayingOrder {
 	}
 
 	public static PlayingOrder createOrderStartingFromPlayer(List<Player> playersInPlayingOrder, Player startFrom) {
-		return new PlayingOrder(playersInPlayingOrder, playersInPlayingOrder.indexOf(startFrom));
+		for (int i = 0; i < playersInPlayingOrder.size(); i++)
+			if (playersInPlayingOrder.get(i) == startFrom)
+				return new PlayingOrder(playersInPlayingOrder, i);
+		return new PlayingOrder(playersInPlayingOrder, 0);
 	}
 
 	private PlayingOrder(List<Player> playersInInitialPlayingOrder, int startingPlayerIndex) {
