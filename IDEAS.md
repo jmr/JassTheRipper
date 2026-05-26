@@ -59,6 +59,26 @@ Cross-suit:
 The 36 binary card-presence indicators alone are sufficient input; the derived features above help
 linear models and shallow trees that can't construct them implicitly.
 
+**Empirical findings (100 FAST + 150 EXTREME deals, 243 clean):**
+
+The heuristic is correct in expectation across all confidence levels:
+
+| Heuristic gap (#1−#2) | n  | mean(score_1−score_2) | #1 win rate |
+|---|---|---|---|
+| 1–10  (low confidence) | 71 | +5.8 pts  | 45.1% |
+| 11–20                  | 53 | +13.5 pts | 45.3% |
+| 21–50                  | 64 | +21.0 pts | 56.2% |
+| 51+   (high confidence)| 51 | +22.7 pts | 64.7% |
+
+Win rate drops below 50% for small gaps because single-game variance is ~35 pts
+(mean|score_1−score_2| ≈ 33–36 across all bands), swamping a 5–13 pt true advantage.
+When #1 loses, #2 and #3 win about equally (52/48) — no systematic rank-2 preference.
+OBEABE is under-represented as actual winner (11%) vs its heuristic nomination rate.
+
+**Conclusion:** A learned patch is unlikely to improve much — the heuristic ordering is
+already correct in expectation; the bottleneck is per-game variance, not miscalibration.
+The most actionable specific finding is that OBEABE may be over-rated by the heuristic.
+
 ## Auto-regressive "who has card" model
 
 In DMCTS, hidden cards are currently distributed uniformly at random across determinizations.
