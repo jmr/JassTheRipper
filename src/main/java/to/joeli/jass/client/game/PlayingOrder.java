@@ -63,7 +63,7 @@ public class PlayingOrder {
 	}
 
 	public Player getPartnerOfPlayer(Player player) {
-		return getPlayerByIndex(playersInInitialPlayingOrder.indexOf(player) + 2);
+		return playersInInitialPlayingOrder.get((player.getSeatId() + 2) % 4);
 	}
 
 	public void moveToNextPlayer() {
