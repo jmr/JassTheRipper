@@ -10,6 +10,9 @@ import java.util.List;
 import java.util.Set;
 
 public class Round {
+	/** Flip to true + recompile to benchmark the pre-optimization playout path. */
+	public static final boolean LEGACY_PLAYOUT = false;
+
 	private final Mode mode;
 	private final int roundNumber;
 	private final PlayingOrder playingOrder;
@@ -77,6 +80,11 @@ public class Round {
 	}
 
 	public EnumSet<Card> getPlayedCards() {
+		if (LEGACY_PLAYOUT) {
+			EnumSet<Card> cards = EnumSet.noneOf(Card.class);
+			for (Move move : moves) cards.add(move.getPlayedCard());
+			return cards;
+		}
 		return playedCardsCache;
 	}
 

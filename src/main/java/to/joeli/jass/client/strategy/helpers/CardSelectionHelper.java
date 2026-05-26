@@ -535,12 +535,18 @@ public class CardSelectionHelper {
 	@NotNull
 	private static Set<Card> getCardsPossibleToPlay(Set<Card> availableCards, Round round) {
 		Mode mode = round.getMode();
-		EnumSet<Card> playedCards = round.getPlayedCards();
-		Color roundColor = round.getRoundColor();
 		Set<Card> validCards = EnumSet.noneOf(Card.class);
-		for (Card card : availableCards)
-			if (mode.canPlayCard(card, playedCards, roundColor, availableCards))
-				validCards.add(card);
+		if (Round.LEGACY_PLAYOUT) {
+			for (Card card : availableCards)
+				if (mode.canPlayCard(card, round.getPlayedCards(), round.getRoundColor(), availableCards))
+					validCards.add(card);
+		} else {
+			EnumSet<Card> playedCards = round.getPlayedCards();
+			Color roundColor = round.getRoundColor();
+			for (Card card : availableCards)
+				if (mode.canPlayCard(card, playedCards, roundColor, availableCards))
+					validCards.add(card);
+		}
 		if (!validCards.isEmpty())
 			return validCards;
 		return availableCards;

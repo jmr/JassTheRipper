@@ -1,12 +1,14 @@
 package to.joeli.jass.game.mode;
 
 import to.joeli.jass.client.game.Game;
+import to.joeli.jass.client.game.Round;
 import to.joeli.jass.game.Trumpf;
 import to.joeli.jass.game.cards.Card;
 import to.joeli.jass.game.cards.CardValue;
 import to.joeli.jass.game.cards.Color;
 
 import java.util.Comparator;
+import java.util.Optional;
 import java.util.Set;
 
 class TrumpfColorMode extends Mode {
@@ -111,6 +113,12 @@ class TrumpfColorMode extends Mode {
 	}
 
 	private boolean isHighestTrumpf(Card card, Set<Card> alreadyPlayedCards) {
+		if (Round.LEGACY_PLAYOUT) {
+			Optional<Card> highest = alreadyPlayedCards.stream()
+					.filter(c -> c.getColor() == trumpfColor)
+					.max(this::compareTrumpf);
+			return !highest.isPresent() || compareTrumpf(card, highest.get()) >= 0;
+		}
 		for (Card played : alreadyPlayedCards)
 			if (played.getColor() == trumpfColor && compareTrumpf(played, card) > 0)
 				return false;
