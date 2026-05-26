@@ -1,6 +1,8 @@
 package to.joeli.jass.client.strategy.training;
 
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
+import to.joeli.jass.client.strategy.benchmarks.SlowBenchmark;
 import to.joeli.jass.client.strategy.config.Config;
 import to.joeli.jass.client.strategy.config.MCTSConfig;
 import to.joeli.jass.client.strategy.config.StrengthLevel;
@@ -18,6 +20,7 @@ import static to.joeli.jass.client.strategy.training.Arena.IMPROVEMENT_THRESHOLD
  *   ./gradlew test --tests "to.joeli.jass.client.strategy.training.UCBBenchmarkTest.explorationConstant_sqrt2_vs_hoeffding"
  * Expected wall time: ~12 minutes (10 games × 36 moves × 2 s/move).
  */
+@Category(SlowBenchmark.class)
 public class UCBBenchmarkTest {
 
     @Test

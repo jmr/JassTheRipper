@@ -1,6 +1,8 @@
 package to.joeli.jass.client.strategy.training;
 
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
+import to.joeli.jass.client.strategy.benchmarks.SlowBenchmark;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import to.joeli.jass.client.game.Game;
@@ -26,6 +28,7 @@ import java.util.*;
  * Run:
  *   ./gradlew test --tests "to.joeli.jass.client.strategy.training.PlayoutBenchmarkTest.randomPlayoutThroughput"
  */
+@Category(SlowBenchmark.class)
 public class PlayoutBenchmarkTest {
 
     private static final Logger resultLogger = LoggerFactory.getLogger("Result");

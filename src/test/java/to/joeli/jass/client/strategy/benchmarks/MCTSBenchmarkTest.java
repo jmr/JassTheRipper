@@ -2,6 +2,7 @@ package to.joeli.jass.client.strategy.benchmarks;
 
 import org.junit.Ignore;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import to.joeli.jass.client.game.GameSession;
 import to.joeli.jass.client.game.Result;
 import to.joeli.jass.client.strategy.RandomJassStrategy;
@@ -20,6 +21,7 @@ import to.joeli.jass.client.strategy.training.networks.ScoreEstimator;
 import static org.junit.Assert.assertTrue;
 import static to.joeli.jass.client.strategy.training.Arena.IMPROVEMENT_THRESHOLD_PERCENTAGE;
 
+@Category(SlowBenchmark.class)
 public class MCTSBenchmarkTest {
 
 	private static final long SEED = 43; // To get a match at the start use 42

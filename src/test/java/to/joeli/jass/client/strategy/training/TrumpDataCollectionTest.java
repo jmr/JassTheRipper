@@ -1,6 +1,8 @@
 package to.joeli.jass.client.strategy.training;
 
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
+import to.joeli.jass.client.strategy.benchmarks.SlowBenchmark;
 import to.joeli.jass.client.strategy.config.Config;
 import to.joeli.jass.client.strategy.config.MCTSConfig;
 import to.joeli.jass.client.strategy.config.StrengthLevel;
@@ -13,6 +15,7 @@ import to.joeli.jass.client.strategy.config.StrengthLevel;
  *
  * Output: src/main/resources/trump_data.csv
  */
+@Category(SlowBenchmark.class)
 public class TrumpDataCollectionTest {
 
     @Test

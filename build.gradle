@@ -91,6 +91,11 @@ dependencies {
 }
 
 test {
+    useJUnit {
+        if (!project.hasProperty("slow")) {
+            excludeCategories 'to.joeli.jass.client.strategy.benchmarks.SlowBenchmark'
+        }
+    }
     if (project.hasProperty("profile")) {
         def agent  = project.findProperty("profilerAgent")  ?: "/opt/local/lib/libasyncProfiler.dylib"
         def output = project.findProperty("profilerOutput") ?: "/tmp/profile.html"
