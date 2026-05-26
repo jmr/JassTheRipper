@@ -7,7 +7,6 @@ import to.joeli.jass.game.cards.CardValue;
 import to.joeli.jass.game.cards.Color;
 
 import java.util.Comparator;
-import java.util.Optional;
 import java.util.Set;
 
 class TrumpfColorMode extends Mode {
@@ -112,15 +111,10 @@ class TrumpfColorMode extends Mode {
 	}
 
 	private boolean isHighestTrumpf(Card card, Set<Card> alreadyPlayedCards) {
-		return highestTrumpf(alreadyPlayedCards)
-				.map(card::isHigherTrumpfThan)
-				.orElse(true);
-	}
-
-	private Optional<Card> highestTrumpf(Set<Card> alreadyPlayedCards) {
-		return alreadyPlayedCards.stream()
-				.filter(card -> card.getColor() == trumpfColor)
-				.max(this::compareTrumpf);
+		for (Card played : alreadyPlayedCards)
+			if (played.getColor() == trumpfColor && compareTrumpf(played, card) > 0)
+				return false;
+		return true;
 	}
 
 	private boolean isTrumpf(Card card) {

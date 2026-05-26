@@ -4,6 +4,7 @@ import to.joeli.jass.game.cards.Card;
 import to.joeli.jass.game.mode.Mode;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -77,10 +78,10 @@ public class Game {
 	}
 
 	public Set<Card> getAlreadyPlayedCards() {
-		Set<Card> cards = currentRound.getPlayedCards();
-		for (Round round : previousRounds) {
-			cards.addAll(round.getPlayedCardsInOrder());
-		}
+		Set<Card> cards = EnumSet.noneOf(Card.class);
+		for (Round round : previousRounds)
+			cards.addAll(round.getPlayedCards());
+		cards.addAll(currentRound.getPlayedCards());
 		return cards;
 	}
 

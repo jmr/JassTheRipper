@@ -14,6 +14,7 @@ public class Round {
 	private final int roundNumber;
 	private final PlayingOrder playingOrder;
 	private final List<Move> moves = new ArrayList<>();
+	private final EnumSet<Card> playedCardsCache = EnumSet.noneOf(Card.class);
 
 	public static Round createRound(Mode gameMode, int roundNumber, PlayingOrder playingOrder) {
 		return new Round(gameMode, roundNumber, playingOrder);
@@ -34,9 +35,11 @@ public class Round {
 		this.mode = round.getMode();
 		this.roundNumber = round.getRoundNumber();
 		this.playingOrder = new PlayingOrder(round.getPlayingOrder());
-		for (Move move : round.getMoves())
-			this.moves.add(new Move(move));
-
+		for (Move move : round.getMoves()) {
+			Move copy = new Move(move);
+			this.moves.add(copy);
+			this.playedCardsCache.add(copy.getPlayedCard());
+		}
 	}
 
 	public void makeMove(Move move) {
@@ -46,6 +49,7 @@ public class Round {
 			throw new RuntimeException("Only four cards can be played in a round.");
 
 		moves.add(move);
+		playedCardsCache.add(move.getPlayedCard());
 		// NOTE: If this method were called here it would be a bit simpler. But it breaks tests
 		// move.getPlayer().onMoveMade(move);
 		playingOrder.moveToNextPlayer();
@@ -72,11 +76,8 @@ public class Round {
 		return mode.determineWinningCard(new ArrayList<>(getPlayedCards()));
 	}
 
-	public Set<Card> getPlayedCards() {
-		Set<Card> cards = EnumSet.noneOf(Card.class);
-		for (Move move : moves)
-			cards.add(move.getPlayedCard());
-		return cards;
+	public EnumSet<Card> getPlayedCards() {
+		return playedCardsCache;
 	}
 
 	public List<Card> getPlayedCardsInOrder() {
@@ -116,7 +117,7 @@ public class Round {
 	}
 
 	public int numberOfPlayedCards() {
-		return getPlayedCards().size();
+		return playedCardsCache.size();
 	}
 
 	public List<Move> getMoves() {
