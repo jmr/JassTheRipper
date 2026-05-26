@@ -63,15 +63,11 @@ class TrumpfColorMode extends Mode {
 
 	@Override
 	public boolean canPlayCard(Card card, Set<Card> alreadyPlayedCards, Color currentRoundColor, Set<Card> playerCards) {
-		final boolean noCardsHaveBeenPlayed = alreadyPlayedCards.isEmpty();
-		boolean hasOtherCardsOfRoundColor = hasOtherCardsOfRoundColor(currentRoundColor, playerCards);
-		final boolean isHighestTrumpfInRound = isTrumpf(card) && isHighestTrumpf(card, alreadyPlayedCards);
-
-		if (noCardsHaveBeenPlayed) return true;
+		if (alreadyPlayedCards.isEmpty()) return true;
 		if (hasOnlyTrumpf(playerCards)) return true;
-		if (isTrumpf(card) && currentRoundColor != trumpfColor) return isHighestTrumpfInRound;
+		if (isTrumpf(card) && currentRoundColor != trumpfColor) return isHighestTrumpf(card, alreadyPlayedCards);
 		if (currentRoundColor == trumpfColor && hasOnlyJackOfTrumpf(playerCards)) return true;
-		else return !hasOtherCardsOfRoundColor || card.getColor() == currentRoundColor;
+		return !hasOtherCardsOfRoundColor(currentRoundColor, playerCards) || card.getColor() == currentRoundColor;
 	}
 
 	private boolean hasOtherCardsOfRoundColor(Color currentRoundColor, Set<Card> playerCards) {
