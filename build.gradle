@@ -90,6 +90,17 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
 }
 
+test {
+    if (project.hasProperty("profile")) {
+        def agent  = project.findProperty("profilerAgent")  ?: "/opt/local/lib/libasyncProfiler.dylib"
+        def output = project.findProperty("profilerOutput") ?: "/tmp/profile.html"
+        def event  = project.findProperty("profilerEvent")  ?: "alloc"
+        def fmt    = project.findProperty("profilerFormat") ?: "flamegraph"
+        def extraParams = (event == "alloc") ? ",alloc=1m" : ",interval=1ms"
+        jvmArgs "-agentpath:${agent}=start,event=${event},file=${output}${extraParams}"
+    }
+}
+
 run {
     if (project.hasProperty("myargs")) {
         args(myargs.split(','))
