@@ -1,14 +1,13 @@
 package to.joeli.jass.game.mode;
 
 import to.joeli.jass.client.game.Game;
-import to.joeli.jass.client.game.Round;
 import to.joeli.jass.game.Trumpf;
 import to.joeli.jass.game.cards.Card;
+import to.joeli.jass.game.cards.CardSet;
 import to.joeli.jass.game.cards.CardValue;
 import to.joeli.jass.game.cards.Color;
 
 import java.util.Comparator;
-import java.util.Optional;
 import java.util.Set;
 
 class TrumpfColorMode extends Mode {
@@ -63,18 +62,43 @@ class TrumpfColorMode extends Mode {
 
 	@Override
 	public boolean canPlayCard(Card card, Set<Card> alreadyPlayedCards, Color currentRoundColor, Set<Card> playerCards) {
-		if (alreadyPlayedCards.isEmpty()) return true;
-		if (hasOnlyTrumpf(playerCards)) return true;
-		if (isTrumpf(card) && currentRoundColor != trumpfColor) return isHighestTrumpf(card, alreadyPlayedCards);
-		if (currentRoundColor == trumpfColor && hasOnlyJackOfTrumpf(playerCards)) return true;
-		return !hasOtherCardsOfRoundColor(currentRoundColor, playerCards) || card.getColor() == currentRoundColor;
+		return canPlayCard(card, CardSet.toBits(alreadyPlayedCards), currentRoundColor, CardSet.toBits(playerCards));
 	}
 
-	private boolean hasOtherCardsOfRoundColor(Color currentRoundColor, Set<Card> playerCards) {
-		for (Card playersCard : playerCards)
-			if (playersCard.getColor() == currentRoundColor)
-				return true;
-		return false;
+	@Override
+	public boolean canPlayCard(Card card, long alreadyPlayedBits, Color currentRoundColor, long playerCardBits) {
+		if (alreadyPlayedBits == 0L) return true;
+		long trumpfMask = CardSet.COLOR_MASKS[trumpfColor.ordinal()];
+		if ((playerCardBits & ~trumpfMask) == 0L) return true;                 // hasOnlyTrumpf
+		long cardBit = 1L << card.ordinal();
+		boolean cardIsTrumpf = (cardBit & trumpfMask) != 0L;
+		if (cardIsTrumpf && currentRoundColor != trumpfColor)
+			return isHighestTrumpf(cardBit, alreadyPlayedBits, trumpfMask);
+		if (currentRoundColor == trumpfColor) {
+			long jackBit = CardSet.JACK_BITS[trumpfColor.ordinal()];
+			if ((playerCardBits & trumpfMask & ~jackBit) == 0L) return true;  // hasOnlyJackOfTrumpf
+		}
+		if (currentRoundColor == null) return true;
+		long roundColorMask = CardSet.COLOR_MASKS[currentRoundColor.ordinal()];
+		return (playerCardBits & roundColorMask) == 0L || card.getColor() == currentRoundColor;
+	}
+
+	private boolean isHighestTrumpf(long cardBit, long alreadyPlayedBits, long trumpfMask) {
+		long trumpfPlayed = alreadyPlayedBits & trumpfMask;
+		if (trumpfPlayed == 0L) return true;
+
+		long jackBit = CardSet.JACK_BITS[trumpfColor.ordinal()];
+		long nineBit = CardSet.NINE_BITS[trumpfColor.ordinal()];
+
+		if ((trumpfPlayed & jackBit) != 0L) return cardBit == jackBit;
+		if (cardBit == jackBit) return true;
+
+		if ((trumpfPlayed & nineBit) != 0L) return cardBit == nineBit;
+		if (cardBit == nineBit) return true;
+
+		// Normal rank order within color: higher ordinal = higher rank (for non-J non-9 cards)
+		long higherBits = trumpfMask & ~jackBit & ~nineBit & -(cardBit << 1);
+		return (trumpfPlayed & higherBits) == 0L;
 	}
 
 	@Override
@@ -91,34 +115,6 @@ class TrumpfColorMode extends Mode {
 	@Override
 	public String toString() {
 		return getTrumpfName() + " - " + getTrumpfColor();
-	}
-
-	private boolean hasOnlyJackOfTrumpf(Set<Card> playerCards) {
-		for (Card cards : playerCards)
-			if (cards.getColor() == trumpfColor)
-				if (cards.getValue() != CardValue.JACK)
-					return false;
-		return true;
-	}
-
-	private boolean hasOnlyTrumpf(Set<Card> cards) {
-		for (Card card : cards)
-			if (card.getColor() != trumpfColor)
-				return false;
-		return true;
-	}
-
-	private boolean isHighestTrumpf(Card card, Set<Card> alreadyPlayedCards) {
-		if (Round.LEGACY_PLAYOUT) {
-			Optional<Card> highest = alreadyPlayedCards.stream()
-					.filter(c -> c.getColor() == trumpfColor)
-					.max(this::compareTrumpf);
-			return !highest.isPresent() || compareTrumpf(card, highest.get()) >= 0;
-		}
-		for (Card played : alreadyPlayedCards)
-			if (played.getColor() == trumpfColor && compareTrumpf(played, card) > 0)
-				return false;
-		return true;
 	}
 
 	private boolean isTrumpf(Card card) {

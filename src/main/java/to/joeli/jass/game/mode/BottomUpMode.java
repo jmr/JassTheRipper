@@ -8,6 +8,8 @@ import to.joeli.jass.game.cards.Color;
 import java.util.Comparator;
 import java.util.Set;
 
+import to.joeli.jass.game.cards.CardSet;
+
 import static to.joeli.jass.game.mode.GeneralRules.calculateLastRoundBonus;
 import static java.lang.String.valueOf;
 
@@ -48,7 +50,12 @@ class BottomUpMode extends Mode {
 
     @Override
     public boolean canPlayCard(Card card, Set<Card> alreadyPlayedCards, Color currentRoundColor, Set<Card> playerCards) {
-        return GeneralRules.canPlayCard(card, alreadyPlayedCards, currentRoundColor, playerCards);
+        return canPlayCard(card, CardSet.toBits(alreadyPlayedCards), currentRoundColor, CardSet.toBits(playerCards));
+    }
+
+    @Override
+    public boolean canPlayCard(Card card, long alreadyPlayedBits, Color currentRoundColor, long playerCardBits) {
+        return GeneralRules.canPlayCard(card, alreadyPlayedBits, currentRoundColor, playerCardBits);
     }
 
     @Override

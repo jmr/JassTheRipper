@@ -3,6 +3,7 @@ package to.joeli.jass.game.mode;
 import to.joeli.jass.client.game.Move;
 import to.joeli.jass.game.Trumpf;
 import to.joeli.jass.game.cards.Card;
+import to.joeli.jass.game.cards.CardSet;
 import to.joeli.jass.game.cards.Color;
 
 import java.util.*;
@@ -113,6 +114,10 @@ public abstract class Mode {
 	}
 
 	public abstract boolean canPlayCard(Card card, Set<Card> alreadyPlayedCards, Color currentRoundColor, Set<Card> playerCards);
+
+	public boolean canPlayCard(Card card, long alreadyPlayedBits, Color currentRoundColor, long playerCardBits) {
+		return canPlayCard(card, CardSet.toEnumSet(alreadyPlayedBits), currentRoundColor, CardSet.toEnumSet(playerCardBits));
+	}
 
 	public abstract int getFactor();
 

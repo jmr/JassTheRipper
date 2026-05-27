@@ -3,6 +3,7 @@ package to.joeli.jass.game.mode;
 import to.joeli.jass.client.game.Game;
 import to.joeli.jass.game.Trumpf;
 import to.joeli.jass.game.cards.Card;
+import to.joeli.jass.game.cards.CardSet;
 import to.joeli.jass.game.cards.Color;
 
 import java.util.Comparator;
@@ -45,7 +46,12 @@ class TopDownMode extends Mode {
 
 	@Override
 	public boolean canPlayCard(Card card, Set<Card> alreadyPlayedCards, Color currentRoundColor, Set<Card> playerCards) {
-		return GeneralRules.canPlayCard(card, alreadyPlayedCards, currentRoundColor, playerCards);
+		return canPlayCard(card, CardSet.toBits(alreadyPlayedCards), currentRoundColor, CardSet.toBits(playerCards));
+	}
+
+	@Override
+	public boolean canPlayCard(Card card, long alreadyPlayedBits, Color currentRoundColor, long playerCardBits) {
+		return GeneralRules.canPlayCard(card, alreadyPlayedBits, currentRoundColor, playerCardBits);
 	}
 
 	@Override

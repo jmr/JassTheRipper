@@ -1,6 +1,7 @@
 package to.joeli.jass.game.mode;
 
 import to.joeli.jass.game.cards.Card;
+import to.joeli.jass.game.cards.CardSet;
 import to.joeli.jass.game.cards.Color;
 
 import java.util.Comparator;
@@ -19,6 +20,13 @@ class GeneralRules {
 		return alreadyPlayedCards.isEmpty()
 				|| card.getColor() == currentRoundColor
 				|| playerCards.stream().noneMatch(playersCard -> playersCard.getColor() == currentRoundColor);
+	}
+
+	public static boolean canPlayCard(Card card, long alreadyPlayedBits, Color currentRoundColor, long playerCardBits) {
+		if (alreadyPlayedBits == 0L) return true;
+		if (card.getColor() == currentRoundColor) return true;
+		if (currentRoundColor == null) return true;
+		return (playerCardBits & CardSet.COLOR_MASKS[currentRoundColor.ordinal()]) == 0L;
 	}
 
 
