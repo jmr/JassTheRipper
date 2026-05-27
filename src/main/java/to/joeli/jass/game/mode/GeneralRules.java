@@ -29,6 +29,12 @@ class GeneralRules {
 		return (playerCardBits & CardSet.COLOR_MASKS[currentRoundColor.ordinal()]) == 0L;
 	}
 
+	public static long validCardsBits(long availableBits, long playedBits, Color roundColor) {
+		if (playedBits == 0L || roundColor == null) return availableBits;
+		long roundColorBits = availableBits & CardSet.COLOR_MASKS[roundColor.ordinal()];
+		return roundColorBits != 0L ? roundColorBits : availableBits;
+	}
+
 
 	public static Card determineWinnerCard(List<Card> cards, Comparator<Card> cardRankComparator, Color trumpfColor) {
 		if (cards == null || cards.isEmpty()) return null;

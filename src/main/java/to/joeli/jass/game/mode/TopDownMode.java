@@ -74,6 +74,11 @@ class TopDownMode extends Mode {
 	}
 
 	@Override
+	public long validCardsBits(long availableBits, long playedBits, Color roundColor) {
+		return GeneralRules.validCardsBits(availableBits, playedBits, roundColor);
+	}
+
+	@Override
 	public int getFactor() {
 		return FACTOR;
 	}

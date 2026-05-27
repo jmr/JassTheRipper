@@ -112,6 +112,54 @@ class TrumpfColorMode extends Mode {
 		return (playerCardBits & roundColorMask) == 0L || card.getColor() == currentRoundColor;
 	}
 
+	@Override
+	public long validCardsBits(long availableBits, long playedBits, Color roundColor) {
+		long trumpfMask = CardSet.COLOR_MASKS[trumpfColor.ordinal()];
+		long playerNonTrumpf = availableBits & ~trumpfMask;
+
+		if (playedBits == 0L || playerNonTrumpf == 0L) return availableBits;
+
+		long playerTrumpf = availableBits & trumpfMask;
+
+		if (roundColor == trumpfColor) {
+			long jackBit = CardSet.JACK_BITS[trumpfColor.ordinal()];
+			if ((playerTrumpf & ~jackBit) == 0L) return availableBits;
+			return playerTrumpf;
+		}
+
+		if (roundColor == null) return availableBits;
+
+		long roundColorBits = availableBits & CardSet.COLOR_MASKS[roundColor.ordinal()];
+		if (roundColorBits == 0L) return availableBits;
+
+		return roundColorBits | validStechenTrumpfBits(playerTrumpf, playedBits, trumpfMask);
+	}
+
+	private long validStechenTrumpfBits(long playerTrumpf, long playedBits, long trumpfMask) {
+		if (playerTrumpf == 0L) return 0L;
+		long trumpfPlayed = playedBits & trumpfMask;
+		if (trumpfPlayed == 0L) return playerTrumpf;
+
+		long jackBit = CardSet.JACK_BITS[trumpfColor.ordinal()];
+		long nineBit = CardSet.NINE_BITS[trumpfColor.ordinal()];
+
+		if ((trumpfPlayed & jackBit) != 0L) return 0L;
+		long validJ = playerTrumpf & jackBit;
+
+		if ((trumpfPlayed & nineBit) != 0L) return validJ;
+
+		long validN = playerTrumpf & nineBit;
+		long normalPlayed = trumpfPlayed & ~jackBit & ~nineBit;
+		long validNorm;
+		if (normalPlayed == 0L) {
+			validNorm = playerTrumpf & ~jackBit & ~nineBit;
+		} else {
+			long highestPlayedBit = Long.highestOneBit(normalPlayed);
+			validNorm = playerTrumpf & ~jackBit & ~nineBit & -(highestPlayedBit << 1);
+		}
+		return validJ | validN | validNorm;
+	}
+
 	private boolean isHighestTrumpf(long cardBit, long alreadyPlayedBits, long trumpfMask) {
 		long trumpfPlayed = alreadyPlayedBits & trumpfMask;
 		if (trumpfPlayed == 0L) return true;

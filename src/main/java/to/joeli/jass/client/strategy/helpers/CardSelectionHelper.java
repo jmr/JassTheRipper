@@ -544,19 +544,7 @@ public class CardSelectionHelper {
 	}
 
 	private static long getCardsPossibleToPlayBits(long availableBits, Round round) {
-		Mode mode = round.getMode();
-		long playedCardBits = round.getPlayedCardBits();
-		Color roundColor = round.getRoundColor();
-		long validBits = 0L;
-		long remaining = availableBits;
-		while (remaining != 0L) {
-			int idx = Long.numberOfTrailingZeros(remaining);
-			Card card = CardSet.CARDS[idx];
-			if (mode.canPlayCard(card, playedCardBits, roundColor, availableBits))
-				validBits |= 1L << idx;
-			remaining &= remaining - 1;
-		}
-		return validBits != 0L ? validBits : availableBits;
+		return round.getMode().validCardsBits(availableBits, round.getPlayedCardBits(), round.getRoundColor());
 	}
 
 

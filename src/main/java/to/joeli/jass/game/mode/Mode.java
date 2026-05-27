@@ -133,6 +133,18 @@ public abstract class Mode {
 		return canPlayCard(card, CardSet.toEnumSet(alreadyPlayedBits), currentRoundColor, CardSet.toEnumSet(playerCardBits));
 	}
 
+	public long validCardsBits(long availableBits, long playedBits, Color roundColor) {
+		long validBits = 0L;
+		long remaining = availableBits;
+		while (remaining != 0L) {
+			int idx = Long.numberOfTrailingZeros(remaining);
+			if (canPlayCard(CardSet.CARDS[idx], playedBits, roundColor, availableBits))
+				validBits |= 1L << idx;
+			remaining &= remaining - 1;
+		}
+		return validBits != 0L ? validBits : availableBits;
+	}
+
 	public abstract int getFactor();
 
 	protected abstract Comparator<Card> createRankComparator();
