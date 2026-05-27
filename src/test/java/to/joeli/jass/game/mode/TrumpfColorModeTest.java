@@ -280,4 +280,73 @@ public class TrumpfColorModeTest {
 
         assertTrue(canCardBePlayed);
     }
+
+    // isHighestTrumpf: J is unconditionally highest
+
+    @Test
+    public void canPlayCard_jackOvertrumpfsNine() {
+        Set<Card> played = EnumSet.of(DIAMOND_SIX, HEART_NINE);
+        Set<Card> playerCards = EnumSet.of(HEART_JACK);
+        assertTrue(Mode.trump(HEARTS).canPlayCard(HEART_JACK, played, DIAMONDS, playerCards));
+    }
+
+    @Test
+    public void canPlayCard_nineCannotOvertrumpfJack() {
+        Set<Card> played = EnumSet.of(DIAMOND_SIX, HEART_JACK);
+        Set<Card> playerCards = EnumSet.of(HEART_NINE, SPADE_SIX); // SPADE_SIX: not trumpf, not round color
+        assertFalse(Mode.trump(HEARTS).canPlayCard(HEART_NINE, played, DIAMONDS, playerCards));
+    }
+
+    @Test
+    public void canPlayCard_aceCannotOvertrumpfJack() {
+        Set<Card> played = EnumSet.of(DIAMOND_SIX, HEART_JACK);
+        Set<Card> playerCards = EnumSet.of(HEART_ACE, SPADE_SIX);
+        assertFalse(Mode.trump(HEARTS).canPlayCard(HEART_ACE, played, DIAMONDS, playerCards));
+    }
+
+    // isHighestTrumpf: 9 is second highest when J absent
+
+    @Test
+    public void canPlayCard_nineOvertrumpfsAce() {
+        Set<Card> played = EnumSet.of(DIAMOND_SIX, HEART_ACE);
+        Set<Card> playerCards = EnumSet.of(HEART_NINE);
+        assertTrue(Mode.trump(HEARTS).canPlayCard(HEART_NINE, played, DIAMONDS, playerCards));
+    }
+
+    @Test
+    public void canPlayCard_aceCannotOvertrumpfNine() {
+        Set<Card> played = EnumSet.of(DIAMOND_SIX, HEART_NINE);
+        Set<Card> playerCards = EnumSet.of(HEART_ACE, SPADE_SIX);
+        assertFalse(Mode.trump(HEARTS).canPlayCard(HEART_ACE, played, DIAMONDS, playerCards));
+    }
+
+    // isHighestTrumpf: normal rank order for non-J non-9 cards (A > K > Q > 10 > 8 > 7 > 6)
+
+    @Test
+    public void canPlayCard_aceOvertrumpfsKing() {
+        Set<Card> played = EnumSet.of(DIAMOND_SIX, HEART_KING);
+        Set<Card> playerCards = EnumSet.of(HEART_ACE);
+        assertTrue(Mode.trump(HEARTS).canPlayCard(HEART_ACE, played, DIAMONDS, playerCards));
+    }
+
+    @Test
+    public void canPlayCard_kingCannotOvertrumpfAce() {
+        Set<Card> played = EnumSet.of(DIAMOND_SIX, HEART_ACE);
+        Set<Card> playerCards = EnumSet.of(HEART_KING, SPADE_SIX);
+        assertFalse(Mode.trump(HEARTS).canPlayCard(HEART_KING, played, DIAMONDS, playerCards));
+    }
+
+    @Test
+    public void canPlayCard_sixCannotOvertrumpfSeven() {
+        Set<Card> played = EnumSet.of(DIAMOND_SIX, HEART_SEVEN);
+        Set<Card> playerCards = EnumSet.of(HEART_SIX, SPADE_SIX);
+        assertFalse(Mode.trump(HEARTS).canPlayCard(HEART_SIX, played, DIAMONDS, playerCards));
+    }
+
+    @Test
+    public void canPlayCard_firstTrumpfOfRoundAlwaysAllowed() {
+        Set<Card> played = EnumSet.of(DIAMOND_SIX);
+        Set<Card> playerCards = EnumSet.of(HEART_SIX);
+        assertTrue(Mode.trump(HEARTS).canPlayCard(HEART_SIX, played, DIAMONDS, playerCards));
+    }
 }
