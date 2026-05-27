@@ -10,6 +10,7 @@ import to.joeli.jass.client.strategy.config.Config;
 import to.joeli.jass.client.strategy.training.networks.CardsEstimator;
 import to.joeli.jass.client.strategy.training.networks.ScoreEstimator;
 import to.joeli.jass.game.cards.Card;
+import to.joeli.jass.game.cards.CardSet;
 import to.joeli.jass.game.mode.Mode;
 
 import java.util.EnumSet;
@@ -23,6 +24,7 @@ public class Player implements Comparable<Player> {
 	private final String name;
 	private int seatId;
 	private final Set<Card> cards;
+	private long cardBits;
 	private JassStrategy jassStrategy;
 
 	public Player(String id, String name, int seatId) {
@@ -46,6 +48,7 @@ public class Player implements Comparable<Player> {
 		this.name = name;
 		this.seatId = seatId;
 		this.cards = cards;
+		this.cardBits = CardSet.toBits(cards);
 		this.jassStrategy = jassStrategy;
 	}
 
@@ -59,6 +62,7 @@ public class Player implements Comparable<Player> {
 		this.name = player.getName();
 		this.seatId = player.getSeatId();
 		this.cards = EnumSet.copyOf(player.getCards());
+		this.cardBits = player.cardBits;
 		this.jassStrategy = player.getJassStrategy();
 	}
 
@@ -107,12 +111,19 @@ public class Player implements Comparable<Player> {
 	public void setCards(Set<Card> cards) {
 		this.cards.clear();
 		this.cards.addAll(cards);
+		this.cardBits = CardSet.toBits(cards);
 	}
 
 	public boolean addCard(Card card) {
 		if (this.getCards().size() == 9)
 			throw new UnsupportedOperationException("Cannot add a card to a player with 9 cards. No player can have more than 9 cards.");
-		return this.cards.add(card);
+		boolean added = this.cards.add(card);
+		if (added) this.cardBits |= 1L << card.ordinal();
+		return added;
+	}
+
+	public long getCardBits() {
+		return cardBits;
 	}
 
 	public void setConfig(Config config) {
@@ -169,8 +180,12 @@ public class Player implements Comparable<Player> {
 	}
 
 	public void onMoveMade(Move move) {
-		if (this.equals(move.getPlayer()) && !cards.remove(move.getPlayedCard()))
-			logger.error("The player {} did not have card {}", move.getPlayer(), move.getPlayedCard());
+		if (this.equals(move.getPlayer())) {
+			if (!cards.remove(move.getPlayedCard()))
+				logger.error("The player {} did not have card {}", move.getPlayer(), move.getPlayedCard());
+			else
+				cardBits &= ~(1L << move.getPlayedCard().ordinal());
+		}
 		jassStrategy.onMoveMade(move);
 	}
 
