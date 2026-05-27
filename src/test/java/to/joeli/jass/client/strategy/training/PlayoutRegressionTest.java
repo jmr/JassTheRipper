@@ -8,10 +8,15 @@ import to.joeli.jass.client.strategy.helpers.CardSelectionHelper;
 import to.joeli.jass.client.strategy.helpers.GameSessionBuilder;
 import to.joeli.jass.client.game.Move;
 import to.joeli.jass.game.cards.Card;
+import to.joeli.jass.game.cards.CardSet;
 import to.joeli.jass.game.cards.Color;
 import to.joeli.jass.game.mode.Mode;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Random;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -46,11 +51,10 @@ public class PlayoutRegressionTest {
         while (!game.gameFinished()) {
             while (!game.getCurrentRound().roundFinished()) {
                 Player p = game.getCurrentPlayer();
-                Set<Card> possible = CardSelectionHelper.getCardsPossibleToPlay(
-                        EnumSet.copyOf(p.getCards()), game);
-                Card card = possible.isEmpty()
+                long possibleBits = CardSelectionHelper.getCardsPossibleToPlayBits(p.getCardBits(), game);
+                Card card = possibleBits == 0L
                         ? p.getCards().iterator().next()
-                        : new ArrayList<>(possible).get(rng.nextInt(possible.size()));
+                        : CardSet.pickRandom(possibleBits, rng);
                 Move move = new Move(p, card);
                 game.makeMove(move);
                 p.onMoveMade(move);

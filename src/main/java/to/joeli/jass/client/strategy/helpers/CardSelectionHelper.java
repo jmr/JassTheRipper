@@ -530,30 +530,33 @@ public class CardSelectionHelper {
 	 */
 	public static Set<Card> getCardsPossibleToPlay(Set<Card> availableCards, Game game) {
 		// if (availableCards.isEmpty()) throw new AssertionError(); // NOTE: Might be a problem inside MCTS
-		return getCardsPossibleToPlay(availableCards, game.getCurrentRound());
+		long bits = getCardsPossibleToPlayBits(CardSet.toBits(availableCards), game.getCurrentRound());
+		return CardSet.toEnumSet(bits);
 	}
 
-	@NotNull
 	private static Set<Card> getCardsPossibleToPlay(Set<Card> availableCards, Round round) {
+		long bits = getCardsPossibleToPlayBits(CardSet.toBits(availableCards), round);
+		return CardSet.toEnumSet(bits);
+	}
+
+	public static long getCardsPossibleToPlayBits(long availableBits, Game game) {
+		return getCardsPossibleToPlayBits(availableBits, game.getCurrentRound());
+	}
+
+	private static long getCardsPossibleToPlayBits(long availableBits, Round round) {
 		Mode mode = round.getMode();
-		Set<Card> validCards = EnumSet.noneOf(Card.class);
-		if (Round.LEGACY_PLAYOUT) {
-			EnumSet<Card> playedCards = round.getPlayedCards();
-			Color roundColor = round.getRoundColor();
-			for (Card card : availableCards)
-				if (mode.canPlayCard(card, playedCards, roundColor, availableCards))
-					validCards.add(card);
-		} else {
-			long playedCardBits = round.getPlayedCardBits();
-			long availableBits = CardSet.toBits(availableCards);
-			Color roundColor = round.getRoundColor();
-			for (Card card : availableCards)
-				if (mode.canPlayCard(card, playedCardBits, roundColor, availableBits))
-					validCards.add(card);
+		long playedCardBits = round.getPlayedCardBits();
+		Color roundColor = round.getRoundColor();
+		long validBits = 0L;
+		long remaining = availableBits;
+		while (remaining != 0L) {
+			int idx = Long.numberOfTrailingZeros(remaining);
+			Card card = CardSet.CARDS[idx];
+			if (mode.canPlayCard(card, playedCardBits, roundColor, availableBits))
+				validBits |= 1L << idx;
+			remaining &= remaining - 1;
 		}
-		if (!validCards.isEmpty())
-			return validCards;
-		return availableCards;
+		return validBits != 0L ? validBits : availableBits;
 	}
 
 

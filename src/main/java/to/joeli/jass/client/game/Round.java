@@ -8,12 +8,8 @@ import to.joeli.jass.game.mode.Mode;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Set;
 
 public class Round {
-	/** Flip to true + recompile to benchmark the pre-optimization playout path. */
-	public static final boolean LEGACY_PLAYOUT = false;
-
 	private final Mode mode;
 	private final int roundNumber;
 	private final PlayingOrder playingOrder;

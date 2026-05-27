@@ -2,7 +2,6 @@ package to.joeli.jass.client.strategy.benchmarks;
 
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
-import to.joeli.jass.client.game.Round;
 import to.joeli.jass.client.strategy.config.Config;
 import to.joeli.jass.client.strategy.config.MCTSConfig;
 import to.joeli.jass.client.strategy.config.StrengthLevel;
@@ -38,8 +37,7 @@ public class StrengthBenchmarkTest {
 
         final double performance = arena.runMatchWithConfigs(configs, NUM_GAMES);
 
-        String label = Round.LEGACY_PLAYOUT ? "LEGACY (pre-optimization)" : "OPTIMIZED";
-        Arena.resultLogger.info("MCTS EXTREME vs RULE_BASED [{}]: {}% ({} games)", label, String.format("%.2f", performance), NUM_GAMES);
-        System.out.printf("MCTS EXTREME vs RULE_BASED [%s]: %.2f%% (%d games)%n", label, performance, NUM_GAMES);
+        Arena.resultLogger.info("MCTS EXTREME vs RULE_BASED: {}% ({} games)", String.format("%.2f", performance), NUM_GAMES);
+        System.out.printf("MCTS EXTREME vs RULE_BASED: %.2f%% (%d games)%n", performance, NUM_GAMES);
     }
 }

@@ -17,6 +17,7 @@ import to.joeli.jass.client.strategy.mcts.src.Board;
 import to.joeli.jass.client.strategy.mcts.src.CallLocation;
 import to.joeli.jass.client.strategy.mcts.src.Move;
 import to.joeli.jass.game.cards.Card;
+import to.joeli.jass.game.cards.CardSet;
 import to.joeli.jass.game.mode.Mode;
 
 import java.util.*;
@@ -72,11 +73,10 @@ public class PlayoutBenchmarkTest {
         while (!game.gameFinished()) {
             while (!game.getCurrentRound().roundFinished()) {
                 Player p = game.getCurrentPlayer();
-                Set<Card> possible = CardSelectionHelper.getCardsPossibleToPlay(
-                        EnumSet.copyOf(p.getCards()), game);
-                Card card = possible.isEmpty()
+                long possibleBits = CardSelectionHelper.getCardsPossibleToPlayBits(p.getCardBits(), game);
+                Card card = possibleBits == 0L
                         ? p.getCards().iterator().next()
-                        : new ArrayList<>(possible).get(rng.nextInt(possible.size()));
+                        : CardSet.pickRandom(possibleBits, rng);
                 CardMove move = new CardMove(p, card);
                 game.makeMove(move);
                 p.onMoveMade(move);
