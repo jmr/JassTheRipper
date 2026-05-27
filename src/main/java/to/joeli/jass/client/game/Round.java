@@ -68,12 +68,11 @@ public class Round {
 	}
 
 	public int calculateScore() {
-
-		return mode.calculateRoundScore(roundNumber, getPlayedCards());
+		return mode.calculateRoundScore(roundNumber, playedCardBits);
 	}
 
 	public Card getWinningCard() {
-		return mode.determineWinningCard(new ArrayList<>(getPlayedCards()));
+		return mode.determineWinningCard(playedCardBits, getRoundColor());
 	}
 
 	public long getPlayedCardBits() {
@@ -98,10 +97,12 @@ public class Round {
 	}
 
 	public Player getWinner() {
-		final Move winningMove = mode.determineWinningMove(this.moves);
-		if (winningMove == null) return null;
-
-		return winningMove.getPlayer();
+		Card winningCard = mode.determineWinningCard(playedCardBits, getRoundColor());
+		if (winningCard == null) return null;
+		for (Move move : moves) {
+			if (winningCard == move.getPlayedCard()) return move.getPlayer();
+		}
+		return null;
 	}
 
 	public boolean hasPlayerAlreadyPlayed(Player player) {

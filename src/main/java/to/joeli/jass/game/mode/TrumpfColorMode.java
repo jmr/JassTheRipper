@@ -42,6 +42,35 @@ class TrumpfColorMode extends Mode {
 	}
 
 	@Override
+	public int calculateRoundScore(int roundNumber, long bits) {
+		int score = 0;
+		long remaining = bits;
+		while (remaining != 0L) {
+			score += getCardScore(CardSet.CARDS[Long.numberOfTrailingZeros(remaining)]);
+			remaining &= remaining - 1;
+		}
+		if (roundNumber == Game.LAST_ROUND_NUMBER) score += GeneralRules.calculateLastRoundBonus(1);
+		return score;
+	}
+
+	@Override
+	public Card determineWinningCard(long playedBits, Color roundColor) {
+		long trumpfMask = CardSet.COLOR_MASKS[trumpfColor.ordinal()];
+		long trumpfPlayed = playedBits & trumpfMask;
+		if (trumpfPlayed != 0L) {
+			long jackBit = CardSet.JACK_BITS[trumpfColor.ordinal()];
+			if ((trumpfPlayed & jackBit) != 0L) return CardSet.CARDS[Long.numberOfTrailingZeros(jackBit)];
+			long nineBit = CardSet.NINE_BITS[trumpfColor.ordinal()];
+			if ((trumpfPlayed & nineBit) != 0L) return CardSet.CARDS[Long.numberOfTrailingZeros(nineBit)];
+			long normalTrumpf = trumpfPlayed & ~jackBit & ~nineBit;
+			return CardSet.CARDS[63 - Long.numberOfLeadingZeros(normalTrumpf)];
+		}
+		if (roundColor == null) return null;
+		long roundBits = playedBits & CardSet.COLOR_MASKS[roundColor.ordinal()];
+		return roundBits == 0L ? null : CardSet.CARDS[63 - Long.numberOfLeadingZeros(roundBits)];
+	}
+
+	@Override
 	public int calculateScore(Set<Card> playedCards) {
 		int score = 0;
 		for (Card card : playedCards)

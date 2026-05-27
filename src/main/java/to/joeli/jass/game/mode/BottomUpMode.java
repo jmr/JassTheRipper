@@ -40,6 +40,25 @@ class BottomUpMode extends Mode {
     }
 
     @Override
+    public int calculateRoundScore(int roundNumber, long bits) {
+        int score = 0;
+        long remaining = bits;
+        while (remaining != 0L) {
+            score += CardSet.CARDS[Long.numberOfTrailingZeros(remaining)].getValue().getBottomUpScore();
+            remaining &= remaining - 1;
+        }
+        if (roundNumber == Game.LAST_ROUND_NUMBER) score += calculateLastRoundBonus(FACTOR);
+        return score;
+    }
+
+    @Override
+    public Card determineWinningCard(long playedBits, Color roundColor) {
+        if (roundColor == null) return null;
+        long roundBits = playedBits & CardSet.COLOR_MASKS[roundColor.ordinal()];
+        return roundBits == 0L ? null : CardSet.CARDS[Long.numberOfTrailingZeros(roundBits)];
+    }
+
+    @Override
     public int calculateScore(Set<Card> playedCards) {
         return FACTOR * playedCards.stream()
                 .mapToInt(card -> card.getValue().getBottomUpScore())

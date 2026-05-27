@@ -98,6 +98,16 @@ public abstract class Mode {
 		return GeneralRules.determineWinnerCard(cards, createRankComparator(), getTrumpfColor());
 	}
 
+	public Card determineWinningCard(long playedBits, Color roundColor) {
+		List<Card> cards = new ArrayList<>();
+		long remaining = playedBits;
+		while (remaining != 0L) {
+			cards.add(CardSet.CARDS[Long.numberOfTrailingZeros(remaining)]);
+			remaining &= remaining - 1;
+		}
+		return determineWinningCard(cards);
+	}
+
 	public Move determineWinningMove(List<Move> moves) {
 		List<Card> cards = new ArrayList<>();
 		for (Move move : moves) {
@@ -111,6 +121,10 @@ public abstract class Mode {
 			}
 		}
 		return null;
+	}
+
+	public int calculateRoundScore(int roundNumber, long bits) {
+		return calculateRoundScore(roundNumber, CardSet.toEnumSet(bits));
 	}
 
 	public abstract boolean canPlayCard(Card card, Set<Card> alreadyPlayedCards, Color currentRoundColor, Set<Card> playerCards);

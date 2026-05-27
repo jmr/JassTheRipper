@@ -38,6 +38,25 @@ class TopDownMode extends Mode {
 	}
 
 	@Override
+	public int calculateRoundScore(int roundNumber, long bits) {
+		int score = 0;
+		long remaining = bits;
+		while (remaining != 0L) {
+			score += CardSet.CARDS[Long.numberOfTrailingZeros(remaining)].getValue().getScore();
+			remaining &= remaining - 1;
+		}
+		if (roundNumber == Game.LAST_ROUND_NUMBER) score += GeneralRules.calculateLastRoundBonus(FACTOR);
+		return score;
+	}
+
+	@Override
+	public Card determineWinningCard(long playedBits, Color roundColor) {
+		if (roundColor == null) return null;
+		long roundBits = playedBits & CardSet.COLOR_MASKS[roundColor.ordinal()];
+		return roundBits == 0L ? null : CardSet.CARDS[63 - Long.numberOfLeadingZeros(roundBits)];
+	}
+
+	@Override
 	public int calculateScore(Set<Card> playedCards) {
 		return FACTOR * playedCards.stream()
 				.mapToInt(card -> card.getValue().getScore())
