@@ -52,7 +52,7 @@ public class PlayoutBenchmarkTest {
         }
 
         // Measure for 60 seconds
-        long durationMs = 60_000;
+        long durationMs = 30_000;
         long start = System.currentTimeMillis();
         long end = start + durationMs;
         int count = 0;

@@ -29,10 +29,10 @@ public class PlayingOrderTest {
 
     @Test
     public void moveToNextPlayer_startsWithCorrectPlayer_ifOffsetWasSpecified() {
-        final Player playerA = new Player("a");
-        final Player playerB = new Player("b");
-        final Player playerC = new Player("c");
-        final Player playerD = new Player("d");
+        final Player playerA = new Player("a"); playerA.setSeatId(0);
+        final Player playerB = new Player("b"); playerB.setSeatId(1);
+        final Player playerC = new Player("c"); playerC.setSeatId(2);
+        final Player playerD = new Player("d"); playerD.setSeatId(3);
         final List<Player> players = asList(playerA, playerB, playerC, playerD);
         final PlayingOrder order = PlayingOrder.createOrderStartingFromPlayer(players, playerC);
 
@@ -47,10 +47,10 @@ public class PlayingOrderTest {
 
     @Test
     public void testGetPlayersInCurrentPlayingOrder() {
-        final Player playerA = new Player("a");
-        final Player playerB = new Player("b");
-        final Player playerC = new Player("c");
-        final Player playerD = new Player("d");
+        final Player playerA = new Player("a"); playerA.setSeatId(0);
+        final Player playerB = new Player("b"); playerB.setSeatId(1);
+        final Player playerC = new Player("c"); playerC.setSeatId(2);
+        final Player playerD = new Player("d"); playerD.setSeatId(3);
         final List<Player> players = asList(playerA, playerB, playerC, playerD);
         final PlayingOrder order = PlayingOrder.createOrderStartingFromPlayer(players, playerC);
 

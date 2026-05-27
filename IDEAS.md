@@ -1,5 +1,25 @@
 # Ideas
 
+## PlayingOrder: fix test rigs to use 4 players, then use `& 3` in getBoundIndex
+
+`PlayingOrder.getBoundIndex` does `% playersInInitialPlayingOrder.size()`. Size is always 4 in
+production, but some tests construct 1-player PlayingOrders as a shortcut (e.g.
+`RoundTest.makeMove_whenAlreadyEnoughCardsWerePlayed`). Fixing those tests to use 4 players (with
+proper seatIds) would let us replace `% size()` with `& 3`, eliminating the modulo and the
+`ArrayList.size()` call. `PlayingOrder.getBoundIndex` appeared at ~2% in the CPU profile.
+
+## Round.makeMove: use identity (`!=`) instead of `.equals()` for player validation
+
+`Round.makeMove` calls `!move.getPlayer().equals(playingOrder.getCurrentPlayer())`. In the hot
+playout path the move was just created from `game.getCurrentPlayer()` — the same object — so
+identity check is correct. `Player.equals` (string comparison on id + name) shows at ~3% in the
+CPU profile. Blocker: `DeepCopyTest.testCopyRound` creates a Move with the *original* game's player
+and applies it to a *deep-copied* round. Either change the test to use the copy's player, or confirm
+that MCTS never actually crosses player contexts (it likely doesn't — moves are created from the
+copied game's `getCurrentPlayer()`).
+
+
+
 ## Thread pool sizing
 
 Currently TIME mode spawns `10 × trumpfStrengthLevel.numDeterminizationsFactor` threads (e.g. 50 for POWERFUL)

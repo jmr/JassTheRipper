@@ -33,7 +33,7 @@ import static org.junit.Assert.fail;
  */
 public class PlayoutRegressionTest {
 
-    private static final String EXPECTED_SEQUENCE = "Player0:C10,Player1:H7,Player2:H8,Player3:HA,Player3:D6,Player0:D7,Player1:H10,Player2:DA,Player1:D8,Player2:DK,Player3:H6,Player0:S10,Player3:SQ,Player0:H9,Player1:S9,Player2:SK,Player0:HQ,Player1:C7,Player2:C8,Player3:HJ,Player3:SJ,Player0:S8,Player1:D10,Player2:SA,Player2:D9,Player3:S6,Player0:CJ,Player1:DJ,Player1:DQ,Player2:CQ,Player3:S7,Player0:C6,Player1:CK,Player2:C9,Player3:CA,Player0:HK";
+    private static final String EXPECTED_SEQUENCE = "Player0:D7,Player1:H10,Player2:D9,Player3:HA,Player3:D6,Player0:S8,Player1:DJ,Player2:DK,Player2:H8,Player3:HJ,Player0:H9,Player1:H7,Player3:SJ,Player0:HQ,Player1:S9,Player2:SK,Player0:HK,Player1:CK,Player2:DA,Player3:H6,Player0:S10,Player1:C7,Player2:SA,Player3:SQ,Player2:C9,Player3:CA,Player0:CJ,Player1:D8,Player3:S6,Player0:C10,Player1:DQ,Player2:CQ,Player3:S7,Player0:C6,Player1:D10,Player2:C8";
 
     @Test
     public void deterministicPlayout_seed42() {

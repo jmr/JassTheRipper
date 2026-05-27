@@ -60,7 +60,10 @@ public final class CardSet {
     }
 
     public static Card pickRandom(long bits, RandomGenerator rng) {
-        int target = rng.nextInt(Long.bitCount(bits));
+        int count = Long.bitCount(bits);
+        // nextInt(bound) uses rejection sampling even for tiny bounds — visible in profiles.
+        // Multiply-shift: floor(uniform31 / 2^31 * count). Bias < 1/2^31, negligible for simulation.
+        int target = (int) (((rng.nextInt() >>> 1) * (long) count) >>> 31);
         long remaining = bits;
         for (int i = 0; i < target; i++) remaining &= remaining - 1;
         return CARDS[Long.numberOfTrailingZeros(remaining)];
