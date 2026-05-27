@@ -64,12 +64,13 @@ public class Game {
 	}
 
 	public Round startNextRound() {
-		updateRoundResult();
+		final Player winner = currentRound.getWinner();
+		updateRoundResult(winner);
 		previousRounds.add(getCurrentRound());
 		if (currentRound.isLastRound() && result.isMatch()) {
 			result.updateWinningTeamScore(calculateMatchBonus());
 		}
-		this.currentRound = createNextRound();
+		this.currentRound = createNextRound(winner);
 		return currentRound;
 	}
 
@@ -121,15 +122,12 @@ public class Game {
 		return 0;
 	}
 
-	private void updateRoundResult() {
-		final int lastScore = this.currentRound.calculateScore();
-		final Player winner = this.currentRound.getWinner();
-
-		result.updateTeamScore(winner, lastScore);
+	private void updateRoundResult(Player winner) {
+		result.updateTeamScore(winner, currentRound.calculateScore());
 	}
 
-	private Round createNextRound() {
-		final PlayingOrder nextPlayingOrder = PlayingOrder.createOrderStartingFromPlayer(getOrder().getPlayersInInitialOrder(), currentRound.getWinner());
+	private Round createNextRound(Player winner) {
+		final PlayingOrder nextPlayingOrder = PlayingOrder.createOrderStartingFromPlayer(getOrder().getPlayersInInitialOrder(), winner);
 		final int nextRoundNumber = currentRound.getRoundNumber() + 1;
 		return Round.createRound(mode, nextRoundNumber, nextPlayingOrder);
 	}
