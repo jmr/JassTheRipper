@@ -1,8 +1,8 @@
 package to.joeli.jass.game.cards;
 
 import java.util.EnumSet;
-import java.util.Random;
 import java.util.Set;
+import java.util.random.RandomGenerator;
 
 public final class CardSet {
 
@@ -59,7 +59,7 @@ public final class CardSet {
         return (bits & (1L << card.ordinal())) != 0;
     }
 
-    public static Card pickRandom(long bits, Random rng) {
+    public static Card pickRandom(long bits, RandomGenerator rng) {
         int target = rng.nextInt(Long.bitCount(bits));
         long remaining = bits;
         for (int i = 0; i < target; i++) remaining &= remaining - 1;

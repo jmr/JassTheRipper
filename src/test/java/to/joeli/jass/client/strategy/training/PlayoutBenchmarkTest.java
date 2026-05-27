@@ -21,6 +21,7 @@ import to.joeli.jass.game.cards.CardSet;
 import to.joeli.jass.game.mode.Mode;
 
 import java.util.*;
+import java.util.random.RandomGenerator;
 
 /**
  * Measures single-threaded random-playout throughput (full game from deal to finish).
@@ -38,13 +39,14 @@ public class PlayoutBenchmarkTest {
     public void randomPlayoutThroughput() {
         GameSession session = GameSessionBuilder.newSession().createGameSession();
         List<Card> cards = new ArrayList<>(Arrays.asList(Card.values()));
-        Random rng = new Random(42);
+        Random shuffleRng = new Random(42);
+        RandomGenerator rng = new SplittableRandom(42);
         Mode mode = Mode.trump(to.joeli.jass.game.cards.Color.HEARTS);
 
         // Warm up JIT
         int warmupRollouts = 500;
         for (int i = 0; i < warmupRollouts; i++) {
-            Collections.shuffle(cards, rng);
+            Collections.shuffle(cards, shuffleRng);
             session.dealCards(cards);
             runRandomPlayout(session, mode, rng);
         }
@@ -55,7 +57,7 @@ public class PlayoutBenchmarkTest {
         long end = start + durationMs;
         int count = 0;
         while (System.currentTimeMillis() < end) {
-            Collections.shuffle(cards, rng);
+            Collections.shuffle(cards, shuffleRng);
             session.dealCards(cards);
             runRandomPlayout(session, mode, rng);
             count++;
@@ -67,7 +69,7 @@ public class PlayoutBenchmarkTest {
         System.out.printf("Rollout throughput: %.0f/sec%n", rolloutsSec);
     }
 
-    private void runRandomPlayout(GameSession session, Mode mode, Random rng) {
+    private void runRandomPlayout(GameSession session, Mode mode, RandomGenerator rng) {
         session.startNewGame(mode, false);
         Game game = session.getCurrentGame();
         while (!game.gameFinished()) {
