@@ -8,6 +8,7 @@ import to.joeli.jass.client.game.Move;
 import to.joeli.jass.client.game.Player;
 import to.joeli.jass.client.game.Round;
 import to.joeli.jass.game.cards.Card;
+import to.joeli.jass.game.cards.CardSet;
 import to.joeli.jass.game.cards.Color;
 import to.joeli.jass.game.mode.Mode;
 
@@ -537,14 +538,17 @@ public class CardSelectionHelper {
 		Mode mode = round.getMode();
 		Set<Card> validCards = EnumSet.noneOf(Card.class);
 		if (Round.LEGACY_PLAYOUT) {
-			for (Card card : availableCards)
-				if (mode.canPlayCard(card, round.getPlayedCards(), round.getRoundColor(), availableCards))
-					validCards.add(card);
-		} else {
 			EnumSet<Card> playedCards = round.getPlayedCards();
 			Color roundColor = round.getRoundColor();
 			for (Card card : availableCards)
 				if (mode.canPlayCard(card, playedCards, roundColor, availableCards))
+					validCards.add(card);
+		} else {
+			long playedCardBits = round.getPlayedCardBits();
+			long availableBits = CardSet.toBits(availableCards);
+			Color roundColor = round.getRoundColor();
+			for (Card card : availableCards)
+				if (mode.canPlayCard(card, playedCardBits, roundColor, availableBits))
 					validCards.add(card);
 		}
 		if (!validCards.isEmpty())

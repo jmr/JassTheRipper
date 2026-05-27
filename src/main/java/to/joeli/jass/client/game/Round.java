@@ -1,6 +1,7 @@
 package to.joeli.jass.client.game;
 
 import to.joeli.jass.game.cards.Card;
+import to.joeli.jass.game.cards.CardSet;
 import to.joeli.jass.game.cards.Color;
 import to.joeli.jass.game.mode.Mode;
 
@@ -17,7 +18,7 @@ public class Round {
 	private final int roundNumber;
 	private final PlayingOrder playingOrder;
 	private final List<Move> moves = new ArrayList<>();
-	private final EnumSet<Card> playedCardsCache = EnumSet.noneOf(Card.class);
+	private long playedCardBits = 0L;
 
 	public static Round createRound(Mode gameMode, int roundNumber, PlayingOrder playingOrder) {
 		return new Round(gameMode, roundNumber, playingOrder);
@@ -41,7 +42,7 @@ public class Round {
 		for (Move move : round.getMoves()) {
 			Move copy = new Move(move);
 			this.moves.add(copy);
-			this.playedCardsCache.add(copy.getPlayedCard());
+			this.playedCardBits |= 1L << copy.getPlayedCard().ordinal();
 		}
 	}
 
@@ -52,7 +53,7 @@ public class Round {
 			throw new RuntimeException("Only four cards can be played in a round.");
 
 		moves.add(move);
-		playedCardsCache.add(move.getPlayedCard());
+		playedCardBits |= 1L << move.getPlayedCard().ordinal();
 		// NOTE: If this method were called here it would be a bit simpler. But it breaks tests
 		// move.getPlayer().onMoveMade(move);
 		playingOrder.moveToNextPlayer();
@@ -79,13 +80,12 @@ public class Round {
 		return mode.determineWinningCard(new ArrayList<>(getPlayedCards()));
 	}
 
+	public long getPlayedCardBits() {
+		return playedCardBits;
+	}
+
 	public EnumSet<Card> getPlayedCards() {
-		if (LEGACY_PLAYOUT) {
-			EnumSet<Card> cards = EnumSet.noneOf(Card.class);
-			for (Move move : moves) cards.add(move.getPlayedCard());
-			return cards;
-		}
-		return playedCardsCache;
+		return CardSet.toEnumSet(playedCardBits);
 	}
 
 	public List<Card> getPlayedCardsInOrder() {
@@ -125,7 +125,7 @@ public class Round {
 	}
 
 	public int numberOfPlayedCards() {
-		return playedCardsCache.size();
+		return Long.bitCount(playedCardBits);
 	}
 
 	public List<Move> getMoves() {
