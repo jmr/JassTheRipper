@@ -130,22 +130,6 @@ public class JassBoard implements Board {
 	}
 
 	/**
-	 * Checks if the players already have cards.
-	 * If they do, we are in a Trumpf selection tree, where the cards are already distributed.
-	 * If they don't, we are in a card selection tree where we the player do not have cards yet.
-	 *
-	 * @return
-	 * @deprecated Now this is solved with the isChoosingTrumpf method
-	 */
-	private boolean cardsAreNotDistributedYet() {
-		for (Player player : this.game.getPlayers()) {
-			if (player.getCards().isEmpty())
-				return true;
-		}
-		return false;
-	}
-
-	/**
 	 * Duplicates the board and determinizes the cards of the other players.
 	 *
 	 * @return
