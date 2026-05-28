@@ -1,6 +1,6 @@
-from keras import Input, Model
-from keras.layers import Dense, Reshape, Softmax, Dropout, GaussianNoise, Activation, BatchNormalization
-from keras.regularizers import l2
+from tensorflow.keras import Input, Model
+from tensorflow.keras.layers import Dense, Reshape, Softmax, Dropout, GaussianNoise, Activation, BatchNormalization
+from tensorflow.keras.regularizers import l2
 
 num_neurons = 256  # TODO Try 32, 64, 128, 256, 512, 1024
 dropout_rate = 0.4

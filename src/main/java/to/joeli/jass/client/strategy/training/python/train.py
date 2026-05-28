@@ -2,23 +2,20 @@ import os
 import sys
 
 import numpy
-from keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint, History
-from keras.engine.saving import load_model
-from keras.optimizers import SGD, Adam
-from tensorflow.contrib.learn.python.learn.estimators._sklearn import train_test_split
+import tensorflow as tf
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, History
+from tensorflow.keras.models import load_model
+from tensorflow.keras.optimizers import SGD, Adam
 from numpy.random import seed
-from tensorflow import set_random_seed
 
 from export_model_checkpoint import ExportModelCheckpoint
 from neural_networks import define_separate_model
 from util import model_path, features_path, targets_path, weights_path, export_path, load_dataset, zero_pad, base_path, \
     shuffle_in_unison
-# from keras_radam import RAdam
-import keras.backend as K
 
 
 def card_accuracy(y_true, y_pred):
-    return K.mean(y_pred)
+    return tf.reduce_mean(y_pred)
 
 
 def train(episode_padded, network_type):
@@ -37,7 +34,7 @@ def train(episode_padded, network_type):
 
     # set random seeds for reproducible experiments
     seed(1)  # numpy
-    set_random_seed(2)  # tensorflow backend
+    tf.random.set_seed(2)  # tensorflow
 
     episode_number = int(episode_padded)
     if episode_number < 0:
@@ -50,10 +47,8 @@ def train(episode_padded, network_type):
             return
         else:
             model = define_separate_model(network_type)
-            optimizer = SGD(lr=1e-2, momentum=0.9, decay=1e-6, nesterov=True)  # use sgd for cards estimation (tried also RAdam, Adam)
-            optimizer = Adam() # use adam for score estimation
-            # Reason for mse: big errors should be punished!
-            loss = 'mse'  # Tried also: 'mae', 'mape', 'kullback_leibler_divergence', 'categorical_crossentropy', 'acc', 'hinge', 'logcosh'
+            optimizer = Adam()
+            loss = 'categorical_crossentropy' if network_type == 'cards/' else 'mse'
             model.compile(loss=loss, optimizer=optimizer,
                           metrics=['acc', 'mae'])
             print("\nCompiled new model")
@@ -89,7 +84,6 @@ def train(episode_padded, network_type):
     print("Training...")
 
     h = History()
-    tb = TensorBoard(log_dir='./Graph', write_images=True)
     es = EarlyStopping(monitor='val_loss', min_delta=0.0001, patience=5, restore_best_weights=True)
     mc = ModelCheckpoint(model_path(episode_padded, network_type), save_best_only=True, save_weights_only=False,
                          verbose=1)
@@ -98,7 +92,7 @@ def train(episode_padded, network_type):
     emc = ExportModelCheckpoint(export_path(episode_padded, network_type), save_best_only=True, verbose=1)
 
     history = model.fit(x_train, y_train, epochs=999, batch_size=32, validation_data=(x_val, y_val),
-                        callbacks=[h, tb, es, mc, wc, emc])
+                        callbacks=[h, es, mc, wc, emc])
 
     min_val_loss = min(history.history['val_loss'])
     print(min_val_loss, file=open(base_path() + "min_val_loss.txt", "w"))  # This file is then read in the Java code

@@ -2,7 +2,8 @@ package to.joeli.jass.client.strategy.training.networks;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tensorflow.Tensor;
+import org.tensorflow.ndarray.StdArrays;
+import org.tensorflow.types.TFloat32;
 import to.joeli.jass.client.game.Game;
 import to.joeli.jass.client.game.Player;
 import to.joeli.jass.client.strategy.helpers.CardKnowledgeBase;
@@ -31,15 +32,15 @@ public class CardsEstimator extends NeuralNetwork {
 	public Map<Card, Distribution> predictCardDistribution(Game game, Set<Card> availableCards) {
 		Map<Card, Distribution> cardKnowledge = CardKnowledgeBase.initCardKnowledge(game, availableCards);
 
-		final Tensor result = (Tensor) predict(NeuralNetworkHelper.getCardsFeatures(game, cardKnowledge));
-		final float[][] probabilities = tensorToFloats(result);
-
-		return addNetworkPredictionToCardKnowledge(game, cardKnowledge, probabilities);
+		try (TFloat32 result = (TFloat32) predict(NeuralNetworkHelper.getCardsFeatures(game, cardKnowledge))) {
+			final float[][] probabilities = tensorToFloats(result);
+			return addNetworkPredictionToCardKnowledge(game, cardKnowledge, probabilities);
+		}
 	}
 
-	private float[][] tensorToFloats(Tensor result) {
-		float[][][] res = new float[1][36][4];
-		result.copyTo(res);
+	private float[][] tensorToFloats(TFloat32 result) {
+		// Result shape is (1, 36, 4); extract the first batch element.
+		float[][][] res = StdArrays.array3dCopyOf(result);
 		return res[0];
 	}
 

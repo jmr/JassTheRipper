@@ -1,10 +1,9 @@
+import os
 import shutil
 import warnings
 import numpy as np
-from keras.backend import get_session
-from keras.callbacks import Callback
-from tensorflow.python.saved_model import saved_model
-from tensorflow.python.saved_model.signature_def_utils_impl import predict_signature_def
+import tensorflow as tf
+from tensorflow.keras.callbacks import Callback
 
 
 class ExportModelCheckpoint(Callback):
@@ -55,17 +54,17 @@ class ExportModelCheckpoint(Callback):
 
         if mode == 'min':
             self.monitor_op = np.less
-            self.best = np.Inf
+            self.best = np.inf
         elif mode == 'max':
             self.monitor_op = np.greater
-            self.best = -np.Inf
+            self.best = -np.inf
         else:
             if 'acc' in self.monitor or self.monitor.startswith('fmeasure'):
                 self.monitor_op = np.greater
-                self.best = -np.Inf
+                self.best = -np.inf
             else:
                 self.monitor_op = np.less
-                self.best = np.Inf
+                self.best = np.inf
 
     def on_epoch_end(self, epoch, logs=None):
         logs = logs or {}
@@ -97,10 +96,8 @@ class ExportModelCheckpoint(Callback):
                 self.export(filepath)
 
     def export(self, filepath):
-        shutil.rmtree(filepath)
-        builder = saved_model.builder.SavedModelBuilder(filepath)
-        signature = predict_signature_def(inputs={'input': self.model.input}, outputs={'output': self.model.output})
-        # using custom tag instead of: tags=[tag_constants.SERVING]
-        builder.add_meta_graph_and_variables(sess=get_session(), tags=["tag"], signature_def_map={'predict': signature})
-        builder.save(as_text=True)
-        builder.save(as_text=False)
+        if os.path.exists(filepath):
+            shutil.rmtree(filepath)
+        # model.export() is the Keras 3 way to produce a SavedModel for serving.
+        # It generates tensor names compatible with TF Java's session runner.
+        self.model.export(filepath)

@@ -2,7 +2,7 @@ import os
 from os.path import isfile, join
 from pathlib import Path
 
-import cbor
+import cbor2
 import numpy as np
 
 # Determines how many episodes back the training data will be used
@@ -24,7 +24,7 @@ def load_cbor(path):
 
 
 def read_cbor(string):
-    string = cbor.loads(string)
+    string = cbor2.loads(string)
     return np.array(string)
 
 
@@ -137,8 +137,8 @@ def keras_path(episode_number, network_type):
 
 
 def model_path(episode_number, network_type):
-    return keras_path(episode_number, network_type) + "model.hdf5"
+    return keras_path(episode_number, network_type) + "model.keras"
 
 
 def weights_path(episode_number, network_type):
-    return keras_path(episode_number, network_type) + "weights.hdf5"
+    return keras_path(episode_number, network_type) + "weights.weights.h5"

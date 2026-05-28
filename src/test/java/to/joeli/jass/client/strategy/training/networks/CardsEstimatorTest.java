@@ -19,7 +19,6 @@ import java.util.Set;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-@Ignore("On Travis CI this test will not work because of the missing model")
 public class CardsEstimatorTest {
 
 
