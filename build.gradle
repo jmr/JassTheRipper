@@ -102,7 +102,7 @@ test {
         def event  = project.findProperty("profilerEvent")  ?: "alloc"
         def fmt    = project.findProperty("profilerFormat") ?: "flamegraph"
         def extraParams = (event == "alloc") ? ",alloc=1m" : ",interval=1ms"
-        jvmArgs "-agentpath:${agent}=start,event=${event},file=${output}${extraParams}"
+        jvmArgs "-agentpath:${agent}=start,event=${event},output=${fmt},file=${output}${extraParams}"
     }
 }
 
