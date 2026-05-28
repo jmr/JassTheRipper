@@ -46,6 +46,31 @@ public class PlayingOrderTest {
     }
 
     @Test
+    public void createOrderStartingFromPlayer_worksWithDeepCopiedPlayer() {
+        final Player playerA = new Player("a"); playerA.setSeatId(0);
+        final Player playerB = new Player("b"); playerB.setSeatId(1);
+        final Player playerC = new Player("c"); playerC.setSeatId(2);
+        final Player playerD = new Player("d"); playerD.setSeatId(3);
+        final List<Player> players = asList(playerA, playerB, playerC, playerD);
+
+        // Deep-copied player: equal by id+name, but not identical (different object).
+        // This is what Round.getWinner() returns for pre-existing moves in MCTS deep copies.
+        final Player copiedPlayerC = new Player(playerC);
+        assertFalse(playerC == copiedPlayerC);
+        assertTrue(playerC.equals(copiedPlayerC));
+
+        final PlayingOrder order = PlayingOrder.createOrderStartingFromPlayer(players, copiedPlayerC);
+
+        assertThat(order.getCurrentPlayer(), equalTo(playerC));
+        order.moveToNextPlayer();
+        assertThat(order.getCurrentPlayer(), equalTo(playerD));
+        order.moveToNextPlayer();
+        assertThat(order.getCurrentPlayer(), equalTo(playerA));
+        order.moveToNextPlayer();
+        assertThat(order.getCurrentPlayer(), equalTo(playerB));
+    }
+
+    @Test
     public void testGetPlayersInCurrentPlayingOrder() {
         final Player playerA = new Player("a"); playerA.setSeatId(0);
         final Player playerB = new Player("b"); playerB.setSeatId(1);

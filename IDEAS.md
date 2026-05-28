@@ -7,7 +7,9 @@ cached as a field in `Round` (was re-derived from `moves.get(0)` on every call).
 
 Benchmarks (30s runs, MacBook Air, back-to-back):
 - Baseline (`rwqowrsz`, pickRandom + `% size()`): 369k rollouts/sec
-- With both changes (`tpvuytpn`): 425k rollouts/sec (+15%)
+- With both changes (`tpvuytpn`): 425k rollouts/sec (+15%) — NOTE: measured with `==` bug (see below)
+- With `.equals()` correctness fix (`xkrklnpy`): 374–393k rollouts/sec (thermal noise dominates; true
+  cost of `.equals()` vs `==` is ~1–2% per the original commit that introduced the bug)
 
 Player[] was also tried as storage for PlayingOrder (commit `vqvvlkzu`) but reverted: it required
 a package-private `getPlayersArray()` accessor and a second overload of

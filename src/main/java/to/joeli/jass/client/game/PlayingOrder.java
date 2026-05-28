@@ -17,7 +17,7 @@ public class PlayingOrder {
 	public static PlayingOrder createOrderStartingFromPlayer(List<Player> playersInPlayingOrder, Player startFrom) {
 		if (startFrom == null) return new PlayingOrder(playersInPlayingOrder, 0);
 		for (int i = 0; i < playersInPlayingOrder.size(); i++)
-			if (playersInPlayingOrder.get(i) == startFrom)
+			if (playersInPlayingOrder.get(i).equals(startFrom))
 				return new PlayingOrder(playersInPlayingOrder, i);
 		return new PlayingOrder(playersInPlayingOrder, 0);
 	}
