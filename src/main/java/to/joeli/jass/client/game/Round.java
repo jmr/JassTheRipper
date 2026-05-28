@@ -15,6 +15,7 @@ public class Round {
 	private final PlayingOrder playingOrder;
 	private final List<Move> moves = new ArrayList<>();
 	private long playedCardBits = 0L;
+	private Color roundColor = null;
 
 	public static Round createRound(Mode gameMode, int roundNumber, PlayingOrder playingOrder) {
 		return new Round(gameMode, roundNumber, playingOrder);
@@ -35,6 +36,7 @@ public class Round {
 		this.mode = round.getMode();
 		this.roundNumber = round.getRoundNumber();
 		this.playingOrder = new PlayingOrder(round.getPlayingOrder());
+		this.roundColor = round.roundColor;
 		for (Move move : round.getMoves()) {
 			Move copy = new Move(move);
 			this.moves.add(copy);
@@ -48,6 +50,7 @@ public class Round {
 		if (moves.size() == 4)
 			throw new RuntimeException("Only four cards can be played in a round.");
 
+		if (roundColor == null) roundColor = move.getPlayedCard().getColor();
 		moves.add(move);
 		playedCardBits |= 1L << move.getPlayedCard().ordinal();
 		// NOTE: If this method were called here it would be a bit simpler. But it breaks tests
@@ -91,9 +94,7 @@ public class Round {
 	}
 
 	public Color getRoundColor() {
-		if (moves.isEmpty()) return null;
-
-		return moves.get(0).getPlayedCard().getColor();
+		return roundColor;
 	}
 
 	public Player getWinner() {

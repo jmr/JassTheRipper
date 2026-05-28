@@ -75,7 +75,7 @@ public class GameSession {
 	public void startNewGame(Mode mode, boolean shifted) {
 		updateResult();
 
-		final PlayingOrder initialOrder = createOrderStartingFromPlayer(getPlayersInInitialPlayingOrder(), gameStartingPlayingOrder.getCurrentPlayer());
+		final PlayingOrder initialOrder = PlayingOrder.createOrderStartingFromPlayer(gameStartingPlayingOrder.getPlayersInInitialOrder(), gameStartingPlayingOrder.getCurrentPlayer());
 		gameStartingPlayingOrder.moveToNextPlayer();
 
 		currentGame = Game.startGame(mode, initialOrder, teams, shifted);

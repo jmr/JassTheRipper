@@ -1,12 +1,35 @@
 # Ideas
 
-## PlayingOrder: fix test rigs to use 4 players, then use `& 3` in getBoundIndex
+## `& 3` in getBoundIndex + roundColor field cache — implemented, +15%
 
-`PlayingOrder.getBoundIndex` does `% playersInInitialPlayingOrder.size()`. Size is always 4 in
-production, but some tests construct 1-player PlayingOrders as a shortcut (e.g.
-`RoundTest.makeMove_whenAlreadyEnoughCardsWerePlayed`). Fixing those tests to use 4 players (with
-proper seatIds) would let us replace `% size()` with `& 3`, eliminating the modulo and the
-`ArrayList.size()` call. `PlayingOrder.getBoundIndex` appeared at ~2% in the CPU profile.
+Done: `getBoundIndex` changed from `% playersInInitialPlayingOrder.size()` to `& 3`; `roundColor`
+cached as a field in `Round` (was re-derived from `moves.get(0)` on every call).
+
+Benchmarks (30s runs, MacBook Air, back-to-back):
+- Baseline (`rwqowrsz`, pickRandom + `% size()`): 369k rollouts/sec
+- With both changes (`tpvuytpn`): 425k rollouts/sec (+15%)
+
+Player[] was also tried as storage for PlayingOrder (commit `vqvvlkzu`) but reverted: it required
+a package-private `getPlayersArray()` accessor and a second overload of
+`createOrderStartingFromPlayer`, adding complexity for 0% net gain. The JIT also de-inlined
+`getRoundColor` when the class shape changed, which the roundColor field cache fixed.
+
+## Round.makeMove: use identity (`!=`) instead of `.equals()` for player validation
+
+`Round.makeMove` calls `!move.getPlayer().equals(playingOrder.getCurrentPlayer())`. In the hot
+playout path the move was just created from `game.getCurrentPlayer()` — the same object — so
+identity check is correct. `Player.equals` (string comparison on id + name) shows at ~3% in the
+CPU profile. Blocker: `DeepCopyTest.testCopyRound` creates a Move with the *original* game's player
+and applies it to a *deep-copied* round. Either change the test to use the copy's player, or confirm
+that MCTS never actually crosses player contexts (it likely doesn't — moves are created from the
+copied game's `getCurrentPlayer()`).
+
+## pickRandom in real MCTS — not yet done
+
+`CardSet.pickRandom` (multiply-shift, O(1)) is called in the benchmark harness but NOT in the real
+MCTS playout. `MCTS.getRandomMove` builds a `List<Move>` and calls `random.nextInt(moves.size())`.
+Changing it to operate on the card bitmask directly would bring the +4.4% pickRandom gain into
+production. Requires threading the `RandomGenerator` into `MCTS` (currently uses `new Random(42)`).
 
 ## Round.makeMove: use identity (`!=`) instead of `.equals()` for player validation
 

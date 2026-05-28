@@ -2,6 +2,7 @@ package to.joeli.jass.client.game;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class PlayingOrder {
 
@@ -9,19 +10,20 @@ public class PlayingOrder {
 	private final int startingPlayerIndex;
 	private int currentPlayerIndex;
 
-	public static PlayingOrder createOrder(List<Player> playersInInitialPlayingOrder) {
-		return new PlayingOrder(playersInInitialPlayingOrder, 0);
+	public static PlayingOrder createOrder(List<Player> playersInPlayingOrder) {
+		return new PlayingOrder(playersInPlayingOrder, 0);
 	}
 
 	public static PlayingOrder createOrderStartingFromPlayer(List<Player> playersInPlayingOrder, Player startFrom) {
+		if (startFrom == null) return new PlayingOrder(playersInPlayingOrder, 0);
 		for (int i = 0; i < playersInPlayingOrder.size(); i++)
 			if (playersInPlayingOrder.get(i) == startFrom)
 				return new PlayingOrder(playersInPlayingOrder, i);
 		return new PlayingOrder(playersInPlayingOrder, 0);
 	}
 
-	private PlayingOrder(List<Player> playersInInitialPlayingOrder, int startingPlayerIndex) {
-		this.playersInInitialPlayingOrder = playersInInitialPlayingOrder;
+	private PlayingOrder(List<Player> playersInPlayingOrder, int startingPlayerIndex) {
+		this.playersInInitialPlayingOrder = playersInPlayingOrder;
 		this.startingPlayerIndex = startingPlayerIndex;
 		this.currentPlayerIndex = 0;
 	}
@@ -33,10 +35,10 @@ public class PlayingOrder {
 	 */
 	public PlayingOrder(PlayingOrder playingOrder) {
 		this.playersInInitialPlayingOrder = new ArrayList<>();
-		for (Player player : playingOrder.getPlayersInInitialOrder())
+		for (Player player : playingOrder.playersInInitialPlayingOrder)
 			this.playersInInitialPlayingOrder.add(new Player(player));
-		this.startingPlayerIndex = playingOrder.getStartingPlayerIndex();
-		this.currentPlayerIndex = playingOrder.getCurrentPlayerIndex();
+		this.startingPlayerIndex = playingOrder.startingPlayerIndex;
+		this.currentPlayerIndex = playingOrder.currentPlayerIndex;
 	}
 
 	public List<Player> getPlayersInInitialOrder() {
@@ -63,15 +65,11 @@ public class PlayingOrder {
 	}
 
 	public Player getPartnerOfPlayer(Player player) {
-		return playersInInitialPlayingOrder.get((player.getSeatId() + 2) % 4);
+		return playersInInitialPlayingOrder.get((player.getSeatId() + 2) & 3);
 	}
 
 	public void moveToNextPlayer() {
 		currentPlayerIndex++;
-	}
-
-	private int getStartingPlayerIndex() {
-		return startingPlayerIndex;
 	}
 
 	private Player getPlayerByIndex(int index) {
@@ -79,13 +77,8 @@ public class PlayingOrder {
 	}
 
 	private int getBoundIndex(int playerPosition) {
-		return (this.startingPlayerIndex + playerPosition) % playersInInitialPlayingOrder.size();
+		return (this.startingPlayerIndex + playerPosition) & 3;
 	}
-
-	private int getCurrentPlayerIndex() {
-		return currentPlayerIndex;
-	}
-
 
 	@Override
 	public boolean equals(Object o) {
@@ -96,7 +89,7 @@ public class PlayingOrder {
 
 		if (startingPlayerIndex != that.startingPlayerIndex) return false;
 		if (currentPlayerIndex != that.currentPlayerIndex) return false;
-		return playersInInitialPlayingOrder != null ? playersInInitialPlayingOrder.equals(that.playersInInitialPlayingOrder) : that.playersInInitialPlayingOrder == null;
+		return Objects.equals(this.playersInInitialPlayingOrder, that.playersInInitialPlayingOrder);
 	}
 
 	@Override

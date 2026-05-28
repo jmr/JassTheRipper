@@ -51,7 +51,7 @@ public class PlayoutBenchmarkTest {
             runRandomPlayout(session, mode, rng);
         }
 
-        // Measure for 60 seconds
+        // Measure for 30 seconds
         long durationMs = 30_000;
         long start = System.currentTimeMillis();
         long end = start + durationMs;
