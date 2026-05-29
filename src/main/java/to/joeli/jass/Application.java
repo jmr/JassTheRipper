@@ -24,7 +24,7 @@ import java.util.concurrent.Future;
  * <pre>
  *     gradlew run -Pmyargs="--url=ws://127.0.0.1:3000,--name=MyBot,--team=1"
  * </pre>
- * Supported flags: --url, --name, --team, --session, --advised-player
+ * Supported flags: --url, --name, --team, --session, --advised-player, --quit
  */
 public class Application {
 	private static final String BOT_NAME = "JassTheRipper";
@@ -53,6 +53,9 @@ public class Application {
 		String advisedPlayer = flags.getOrDefault("advised-player", null);
 		Player player = new Player(name, new JassTheRipperJassStrategy());
 		new RemoteGame(url, player, SessionType.SINGLE_GAME, session, team, advisedPlayer).start();
+		if (flags.containsKey("quit")) {
+			System.exit(0);
+		}
 	}
 
 	private static void startHumanGame(String url) {
