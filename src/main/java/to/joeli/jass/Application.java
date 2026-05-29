@@ -3,6 +3,9 @@ package to.joeli.jass;
 import to.joeli.jass.client.RemoteGame;
 import to.joeli.jass.client.game.Player;
 import to.joeli.jass.client.strategy.JassTheRipperJassStrategy;
+import to.joeli.jass.client.strategy.config.Config;
+import to.joeli.jass.client.strategy.config.MCTSConfig;
+import to.joeli.jass.client.strategy.config.StrengthLevel;
 import to.joeli.jass.messages.type.SessionType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,7 +27,9 @@ import java.util.concurrent.Future;
  * <pre>
  *     gradlew run -Pmyargs="--url=ws://127.0.0.1:3000,--name=MyBot,--team=1"
  * </pre>
- * Supported flags: --url, --name, --team, --session, --advised-player, --quit
+ * Supported flags: --url, --name, --team, --session, --advised-player, --quit,
+ *   --strength=&lt;level&gt; where level is any {@link to.joeli.jass.client.strategy.config.StrengthLevel}
+ *   name (e.g. FAST, STRONG, POWERFUL, EXTREME). Default: POWERFUL (1000ms/move).
  */
 public class Application {
 	private static final String BOT_NAME = "JassTheRipper";
@@ -51,7 +56,10 @@ public class Application {
 
 		String session = flags.getOrDefault("session", "Java Client Session");
 		String advisedPlayer = flags.getOrDefault("advised-player", null);
-		Player player = new Player(name, new JassTheRipperJassStrategy());
+		JassTheRipperJassStrategy strategy = flags.containsKey("strength")
+				? new JassTheRipperJassStrategy(new Config(new MCTSConfig(StrengthLevel.valueOf(flags.get("strength")))))
+				: new JassTheRipperJassStrategy();
+		Player player = new Player(name, strategy);
 		new RemoteGame(url, player, SessionType.SINGLE_GAME, session, team, advisedPlayer).start();
 		if (flags.containsKey("quit")) {
 			System.exit(0);
