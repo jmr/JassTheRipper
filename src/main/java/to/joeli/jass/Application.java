@@ -32,6 +32,7 @@ import java.util.concurrent.Future;
  * Supported flags: --url, --name, --team, --session, --advised-player, --quit,
  *   --strength=&lt;level&gt; where level is any {@link to.joeli.jass.client.strategy.config.StrengthLevel}
  *   name (e.g. FAST, STRONG, POWERFUL, EXTREME). Default: POWERFUL (1000ms/move).
+ *   --cards-estimator=&lt;episode&gt; load the cards neural network from the given episode (e.g. 0).
  */
 public class Application {
 	private static final String BOT_NAME = "JassTheRipper";
@@ -65,7 +66,19 @@ public class Application {
 			mctsConfig.setRunMode(RunMode.valueOf(flags.get("mode")));
 		if (flags.containsKey("runs-scaling"))
 			mctsConfig.setRunsScaling(RunsScaling.valueOf(flags.get("runs-scaling")));
-		JassTheRipperJassStrategy strategy = new JassTheRipperJassStrategy(new Config(mctsConfig));
+
+		Config config = new Config(mctsConfig);
+		if (flags.containsKey("cards-estimator"))
+			config.setCardsEstimatorUsed(true);
+
+		JassTheRipperJassStrategy strategy = new JassTheRipperJassStrategy(config);
+
+		if (flags.containsKey("cards-estimator")) {
+			int episode = Integer.parseInt(flags.get("cards-estimator"));
+			strategy.getCardsEstimator().loadModel(episode);
+			logger.info("Loaded cards estimator from episode {}", episode);
+		}
+
 		Player player = new Player(name, strategy);
 		new RemoteGame(url, player, SessionType.SINGLE_GAME, session, team, advisedPlayer).start();
 		if (flags.containsKey("quit")) {
