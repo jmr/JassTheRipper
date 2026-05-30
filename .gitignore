@@ -1,6 +1,7 @@
-build
-.idea
-.gradle
+build/
+.idea/
+.gradle/
+.venv/
 *.log
 *.iml
 out
