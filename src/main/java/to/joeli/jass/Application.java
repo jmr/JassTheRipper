@@ -6,6 +6,7 @@ import to.joeli.jass.client.strategy.JassTheRipperJassStrategy;
 import to.joeli.jass.client.strategy.config.Config;
 import to.joeli.jass.client.strategy.config.MCTSConfig;
 import to.joeli.jass.client.strategy.config.RunMode;
+import to.joeli.jass.client.strategy.config.RunsScaling;
 import to.joeli.jass.client.strategy.config.StrengthLevel;
 import to.joeli.jass.messages.type.SessionType;
 import org.slf4j.Logger;
@@ -62,6 +63,8 @@ public class Application {
 				: new MCTSConfig();
 		if (flags.containsKey("mode"))
 			mctsConfig.setRunMode(RunMode.valueOf(flags.get("mode")));
+		if (flags.containsKey("runs-scaling"))
+			mctsConfig.setRunsScaling(RunsScaling.valueOf(flags.get("runs-scaling")));
 		JassTheRipperJassStrategy strategy = new JassTheRipperJassStrategy(new Config(mctsConfig));
 		Player player = new Player(name, strategy);
 		new RemoteGame(url, player, SessionType.SINGLE_GAME, session, team, advisedPlayer).start();

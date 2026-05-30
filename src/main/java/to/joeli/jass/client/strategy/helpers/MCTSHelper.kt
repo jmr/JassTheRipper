@@ -83,7 +83,8 @@ class MCTSHelper(private val mctsConfig: MCTSConfig) {
 
         var numDeterminizations = computeNumDeterminizations(gameSession, isChoosingTrumpf, strengthLevel.numDeterminizationsFactor)
 
-        var numRuns = strengthLevel.numRuns
+        val roundNumber = if (isChoosingTrumpf) 0 else gameSession.currentRound!!.roundNumber
+        var numRuns = mctsConfig.runsScaling.computeRuns(strengthLevel.numRuns, roundNumber)
         if (scoreEstimator != null) {
             logger.info("Using a score estimator network to determine the score")
             if (mctsConfig.runMode === RunMode.RUNS) {

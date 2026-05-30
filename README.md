@@ -24,6 +24,7 @@ or gradle:
 #        --quit (exit after session ends)
 #        --strength=<level>  (see StrengthLevel.kt for levels, default POWERFUL = 1s/move)
 #        --mode=TIME|RUNS    (TIME: fixed wall-clock budget; RUNS: fixed iteration count, default TIME)
+#        --runs-scaling=FLAT|LINEAR|QUADRATIC    (RUNS mode only: distribute numRuns across rounds, default FLAT; see RunsScaling.kt)
 ```
 
 Run specific test

@@ -7,6 +7,7 @@ import kotlin.math.sqrt
 
 class MCTSConfig {
     var runMode = RunMode.TIME
+    var runsScaling = RunsScaling.FLAT
     var trumpfStrengthLevel = StrengthLevel.POWERFUL
     var cardStrengthLevel = StrengthLevel.POWERFUL
 
