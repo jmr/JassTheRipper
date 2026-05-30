@@ -15,6 +15,22 @@ package to.joeli.jass.client.strategy.config
  *
  *
  * IMPORTANT: numRuns is a hyperparameter. Determines how many nodes should be explored in one mcts tree
+ *
+ *
+ * Card rollouts per move (RUNS mode), where round is 0-indexed (0 = first trick, 8 = last):
+ * ```
+ * numDeterminizations = (9 - round) * numDeterminizationsFactor
+ * cardsPerPlayout     = 4 * (9 - round)   // 4 players, one card each per remaining trick
+ * cardsPerMove        = numDeterminizations * numRuns * cardsPerPlayout
+ *                     = 4 * (9-round)^2 * numDeterminizationsFactor * numRuns
+ * ```
+ * For POWERFUL (factor=5, numRuns=200) at rounds 0/4/8: ~324k / ~100k / ~4k cards/move.
+ * Summed over all 9 rounds: 4 * factor * numRuns * Σ(k=1..9) k²  =  4 * factor * numRuns * 285
+ * For POWERFUL: 4 * 5 * 200 * 285 = 1,140,000 card simulations per game.
+ * In TIME mode, numRuns is unused. Each determinization thread loops until the clock runs out:
+ * ```
+ * effectiveRunsPerDet ≈ (maxThinkingTime_ms / 1000) * rolloutSpeed   // rolloutSpeed in rollouts/sec, hardware-dependent
+ * ```
  */
 enum class StrengthLevel constructor(val numDeterminizationsFactor: Int, val maxThinkingTime: Long, val numRuns: Long) {
 
