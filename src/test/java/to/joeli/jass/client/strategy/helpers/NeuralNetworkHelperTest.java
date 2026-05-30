@@ -11,6 +11,7 @@ import to.joeli.jass.game.cards.Color;
 import to.joeli.jass.game.mode.Mode;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -125,6 +126,28 @@ public class NeuralNetworkHelperTest {
 	public void testAnalogousScoreFeaturesForNoTrumpfHas1Item() {
 		final Game game = GameSessionBuilder.newSession().withStartedGame(Mode.bottomUp()).createGameSession().getCurrentGame();
 		assertEquals(1, NeuralNetworkHelper.getAnalogousScoreFeatures(game).size());
+	}
+
+	@Test
+	public void testCardsFeaturesEncodeSampledAssignmentAs1Hot() {
+		// Auto-regressive determinization depends on the contract that a 1-hot sampled
+		// cardKnowledge entry produces a 1-hot row in CARDS_DISTRIBUTION. Without that,
+		// re-inference can't condition on prior assignments.
+		Game clubsGame = GameSessionBuilder.startedClubsGame();
+		Map<Card, Distribution> cardKnowledge = CardKnowledgeBase.initCardKnowledge(
+				clubsGame, clubsGame.getCurrentPlayer().getCards());
+
+		Player assigned = clubsGame.getPlayersBySeatId().get(2);
+		cardKnowledge.put(Card.HEART_SEVEN,
+				new Distribution(Collections.singletonMap(assigned, 1f), true));
+
+		float[][] features = NeuralNetworkHelper.getCardsFeatures(clubsGame, cardKnowledge);
+
+		// HEART_SEVEN is index 1 in Card.values(); CARDS_DISTRIBUTION starts at row 37.
+		// Probability columns are at offsets 14..17 (one per seat id).
+		float[] row = features[37 + 1];
+		assertArrayEquals(new float[]{0f, 0f, 1f, 0f},
+				new float[]{row[14], row[15], row[16], row[17]}, DELTA);
 	}
 
 	@Test

@@ -21,6 +21,10 @@ public class CardKnowledgeBase {
 
 	public static final Logger logger = LoggerFactory.getLogger(CardKnowledgeBase.class);
 
+	// Re-run the cards network every this many assignments (auto-regressive approach A).
+	// k=1: fully auto-regressive (~27 calls/det); k=3: ~9 calls; k=27: no re-inference (1 call).
+	static final int REINFERENCE_EVERY_K = 3;
+
 	private CardKnowledgeBase() {
 
 	}
@@ -131,18 +135,36 @@ public class CardKnowledgeBase {
 		// Delete all the cards of the players so we can distribute the determinization
 		game.getPlayers().forEach(player -> player.setCards(EnumSet.noneOf(Card.class)));
 
+		int assignedCount = 0;
 		while (cardsNeedToBeDistributed(cardKnowledge)) {
-			getStreamWithNotSampledDistributions(cardKnowledge)
-					.min(Comparator.comparingInt(entry -> entry.getValue().size())) // Select the card with the least possible players
-					.ifPresent(entry -> {
-						Card card = entry.getKey();
-						Player player = entry.getValue().sample(); // Select a player at random based on the probabilities of the distribution
-						player.addCard(card);
-						// Set distribution of already distributed card to sampled so it is not selected anymore in future runs
-						entry.getValue().setSampled(true);
+			// Auto-regressive re-inference: every REINFERENCE_EVERY_K assignments, re-run the
+			// network conditioned on already-assigned cards (which appear as 1-hot certainties
+			// in the feature input). Skip on the first iteration (nothing assigned yet).
+			if (cardsEstimator != null && assignedCount > 0 && assignedCount % REINFERENCE_EVERY_K == 0) {
+				cardsEstimator.refineCardDistribution(game, cardKnowledge);
+			}
 
-						deletePlayerFromRemainingDistributions(game, availableCards, cardKnowledge, player);
-					});
+			Optional<Map.Entry<Card, Distribution>> best;
+			Stream<Map.Entry<Card, Distribution>> stream = getStreamWithNotSampledDistributions(cardKnowledge);
+			if (cardsEstimator != null) {
+				// Commit to highest-confidence assignments first so downstream re-inference is most useful
+				best = stream.max(Comparator.comparingDouble(e -> e.getValue().maxProbability()));
+			} else {
+				// Arc-consistency: fewest possible players first (best for uniform distributions)
+				best = stream.min(Comparator.comparingInt(e -> e.getValue().size()));
+			}
+
+			if (best.isPresent()) {
+				Map.Entry<Card, Distribution> entry = best.get();
+				Card card = entry.getKey();
+				Player player = entry.getValue().sample();
+				player.addCard(card);
+				// Collapse to 1-hot so subsequent re-inference encodes this assignment
+				// as a certainty in CARDS_DISTRIBUTION rather than the prior soft distribution.
+				entry.setValue(new Distribution(Collections.singletonMap(player, 1f), true));
+				deletePlayerFromRemainingDistributions(game, availableCards, cardKnowledge, player);
+				assignedCount++;
+			}
 		}
 
 		/*

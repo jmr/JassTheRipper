@@ -80,6 +80,12 @@ public class Distribution {
 		return probabilities.size();
 	}
 
+	public float maxProbability() {
+		float max = 0f;
+		for (float p : probabilities.values()) if (p > max) max = p;
+		return max;
+	}
+
 	public boolean hasPlayer(Player player) {
 		return probabilities.containsKey(player);
 	}

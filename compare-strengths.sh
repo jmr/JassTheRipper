@@ -34,5 +34,5 @@ run_match() {
 # Build once upfront so parallel gradle runs don't race on compilation.
 ./gradlew classes
 
-# POWERFUL+CardsEstimator vs plain POWERFUL: does the card prediction network improve determinization quality?
-run_match "PowerfulCards" "POWERFUL" "FLAT" "Powerful" "POWERFUL" "FLAT" "RUNS" "0" ""
+# AutoRegCardEstK3 vs plain POWERFUL: iterative re-inference every 3 assignments (~9 network calls/det)
+run_match "AutoRegCardEstK3" "POWERFUL" "FLAT" "Powerful" "POWERFUL" "FLAT" "RUNS" "0" ""

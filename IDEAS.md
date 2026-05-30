@@ -139,6 +139,56 @@ predictions and ignores cross-card constraints. A better card-distribution model
 determinization search space and improve MCTS decision quality, especially early in the game when few
 cards have been played and uncertainty is high.
 
+### Implementation options
+
+**Option 1 — Iterative re-inference (implemented, k=3):**
+Use the existing single-shot network but call it multiple times per determinization. After every k
+card assignments, re-run the network with the partial assignment encoded as 1-hot certainties in the
+CARDS_DISTRIBUTION feature rows. This conditions each batch of assignments on prior ones. Also
+changed sampling order to highest-confidence-first (max probability) instead of fewest-players-first,
+so the most certain assignments happen early and provide the most useful context for re-inference.
+Cost: ~9 network calls/determinization at round 0 (k=3) vs 1 previously. REINFERENCE_EVERY_K is
+easy to ablate: k=1 is fully auto-regressive (~27 calls), k=27 disables re-inference (1 call).
+Mild OOD caveat: the network was trained on fully-uniform hidden-card rows; mid-assignment inputs
+(some 1-hot, rest uniform) are a new input pattern. Works because the encoding format is identical.
+
+**Option 2 — Retrain with partial-assignment inputs:**
+Generate ~27 training examples per game by randomizing the card reveal order and masking the rest.
+Same architecture, same features. Fixes the mild OOD issue of option 1. Worth doing only if
+option 1 shows signal. Randomize reveal order at train time (not easiest-first) to avoid
+underfitting the hard mid-sequence steps.
+
+**Option 3 — Sequential model (transformer/LSTM):** Skipped. For ≤27 fixed steps with a
+bag-of-cards structure, a new architecture buys little over option 2 at high engineering cost.
+
+### Other ideas in this space
+
+- **Sampling order only (free):** Change `CardKnowledgeBase` to pick highest-max-probability card
+  first even without re-inference. Already done as part of option 1 above.
+- **Importance-weighted resampling:** Generate K full determinizations with a single network call,
+  score each by ∏ P(assigned player | card), resample with weights. No OOD issue, one network call.
+- **Metropolis-Hastings on the joint:** Propose card swaps between players, accept by network
+  probability ratio. Cheap if scored from a single forward pass.
+
+### Empirical findings
+
+- **k=1 (fully auto-regressive), 256 games, RUNS mode, POWERFUL vs POWERFUL+AR:**
+  Powerful 21285 vs AutoRegCardEstK1 19907. t=-0.96 (p=0.34), sign 122W/134L (p=0.49).
+  Clean wash with a small (~5 pts/game) numeric lean toward AR being slightly worse —
+  consistent with OOD-compounding hurting at every step but too small to act on.
+- **Prior context (thesis, 1k games):** baseline single-shot CardsEstimator showed no
+  advantage over null (uniform) determinization. AR variants are refinements of a signal
+  that may not exist.
+- **k=3 / k=9 ablations:** k=3 currently set in code; pending run. Only diagnostic if
+  k=1 had been *significantly worse* than baseline (which it wasn't). Useful only to
+  rule out OOD compounding as the explanation for the small negative lean.
+
+**Conclusion:** AR direction is effectively dead with the current network. To revive,
+would need first to re-establish that the baseline CardsEstimator carries useful signal
+at 256+ games (the original thesis test at 1k was negative, but the integration may have
+been buggy in ways analogous to the 1-hot collapse bug found here). Option 2 (retraining
+with partial-assignment inputs) is on hold pending that.
+
 ## UCB exploration constant (empirical findings)
 
 Benchmarked via duplicate-Jass Arena (swapped-cards pairs), EXTREME strength (2 s/move):

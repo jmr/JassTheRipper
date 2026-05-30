@@ -47,19 +47,38 @@ public class CardsEstimator extends NeuralNetwork {
 	/**
 	 * Here we take the information from the card knowledge we know for sure
 	 * and replace the variable, guessed part with the estimation of the neural network
-	 *
-	 * @param game
-	 * @param cardKnowledge
-	 * @param probabilities
-	 * @return
 	 */
 	private Map<Card, Distribution> addNetworkPredictionToCardKnowledge(Game game, Map<Card, Distribution> cardKnowledge, float[][] probabilities) {
+		updateCardDistributions(game, cardKnowledge, probabilities, false);
+		return cardKnowledge;
+	}
+
+	/**
+	 * Re-runs inference using the current partial cardKnowledge as input features (which may contain
+	 * 1-hot certainties for already-sampled cards). Updates only unsampled distributions in-place.
+	 * This enables auto-regressive conditioning: after assigning some cards, the network can condition
+	 * on those assignments when predicting the remaining ones.
+	 */
+	public void refineCardDistribution(Game game, Map<Card, Distribution> cardKnowledge) {
+		try (TFloat32 result = (TFloat32) predict(NeuralNetworkHelper.getCardsFeatures(game, cardKnowledge))) {
+			updateCardDistributions(game, cardKnowledge, tensorToFloats(result), true);
+		}
+	}
+
+	/**
+	 * Replaces each unsampled (or all, if skipSampled=false) cardKnowledge entry with a new
+	 * Distribution built from the network's per-(card, player) probabilities. Players excluded
+	 * by the old distribution are dropped and their probability rebalanced onto the rest.
+	 */
+	private void updateCardDistributions(Game game, Map<Card, Distribution> cardKnowledge, float[][] probabilities, boolean skipSampled) {
 		final List<Player> players = game.getPlayersBySeatId();
 		final Card[] cards = Card.values();
 		for (int c = 0; c < cards.length; c++) {
+			final Distribution oldDistribution = cardKnowledge.get(cards[c]);
+			if (oldDistribution == null) continue;
+			if (skipSampled && oldDistribution.isSampled()) continue;
 			HashMap<Player, Float> playerProbabilities = new HashMap<>();
 			List<Player> playersWithZeroProbabilities = new ArrayList<>();
-			final Distribution oldDistribution = cardKnowledge.get(cards[c]);
 			for (int p = 0; p < players.size(); p++) {
 				final Player player = players.get(p);
 				if (!oldDistribution.hasPlayer(player))
@@ -67,10 +86,8 @@ public class CardsEstimator extends NeuralNetwork {
 				playerProbabilities.put(player, probabilities[c][p]);
 			}
 			final Distribution distribution = new Distribution(playerProbabilities, oldDistribution.isSampled());
-			// When we know already for sure that one player cannot have a card we redistribute this probability to the remaining players
 			playersWithZeroProbabilities.forEach(distribution::deleteEventAndReBalance);
 			cardKnowledge.put(cards[c], distribution);
 		}
-		return cardKnowledge;
 	}
 }
