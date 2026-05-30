@@ -5,6 +5,7 @@ import to.joeli.jass.client.game.Player;
 import to.joeli.jass.client.strategy.JassTheRipperJassStrategy;
 import to.joeli.jass.client.strategy.config.Config;
 import to.joeli.jass.client.strategy.config.MCTSConfig;
+import to.joeli.jass.client.strategy.config.RunMode;
 import to.joeli.jass.client.strategy.config.StrengthLevel;
 import to.joeli.jass.messages.type.SessionType;
 import org.slf4j.Logger;
@@ -56,9 +57,12 @@ public class Application {
 
 		String session = flags.getOrDefault("session", "Java Client Session");
 		String advisedPlayer = flags.getOrDefault("advised-player", null);
-		JassTheRipperJassStrategy strategy = flags.containsKey("strength")
-				? new JassTheRipperJassStrategy(new Config(new MCTSConfig(StrengthLevel.valueOf(flags.get("strength")))))
-				: new JassTheRipperJassStrategy();
+		MCTSConfig mctsConfig = flags.containsKey("strength")
+				? new MCTSConfig(StrengthLevel.valueOf(flags.get("strength")))
+				: new MCTSConfig();
+		if (flags.containsKey("mode"))
+			mctsConfig.setRunMode(RunMode.valueOf(flags.get("mode")));
+		JassTheRipperJassStrategy strategy = new JassTheRipperJassStrategy(new Config(mctsConfig));
 		Player player = new Player(name, strategy);
 		new RemoteGame(url, player, SessionType.SINGLE_GAME, session, team, advisedPlayer).start();
 		if (flags.containsKey("quit")) {

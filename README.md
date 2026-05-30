@@ -21,7 +21,9 @@ or gradle:
 ```bash
 ./gradlew run -Pmyargs="--url=ws://127.0.0.1:3000,--team=1,--name=MyBot,--quit"
 # Flags: --url (default ws://127.0.0.1:3000), --name (default JassTheRipper), --team (default 1),
-#        --quit (exit after session ends), --strength (see StrengthLevel.kt, default POWERFUL)
+#        --quit (exit after session ends)
+#        --strength=<level>  (see StrengthLevel.kt for levels, default POWERFUL = 1s/move)
+#        --mode=TIME|RUNS    (TIME: fixed wall-clock budget; RUNS: fixed iteration count, default TIME)
 ```
 
 Run specific test
