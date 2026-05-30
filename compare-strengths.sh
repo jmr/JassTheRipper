@@ -32,5 +32,5 @@ run_match() {
 # Build once upfront so parallel gradle runs don't race on compilation.
 ./gradlew classes
 
-# Flat vs Quadratic: extremes show the largest difference between scaling modes.
-run_match "Flat"      "POWERFUL_10X" "FLAT"      "Quadratic" "POWERFUL_10X" "QUADRATIC"
+# POWERFUL vs POWERFUL_100X_DETS: does 100x more determinizations improve play quality?
+run_match "Powerful" "POWERFUL" "FLAT" "Powerful100xDets" "POWERFUL_100X_DETS" "FLAT"

@@ -39,6 +39,9 @@ enum class StrengthLevel constructor(val numDeterminizationsFactor: Int, val max
     FAST(3, 200, 40),
     STRONG(4, 500, 100),
     POWERFUL(5, 1000, 200),
+    POWERFUL_10X(5, 1000, 2000),      // temporary: 10x numRuns of POWERFUL to test RUNS mode scaling
+    POWERFUL_100X(5, 1000, 20000),    // temporary: 100x numRuns of POWERFUL (~reasonable think time on dev machine)
+    POWERFUL_100X_DETS(500, 1000, 200), // temporary: 100x numDeterminizationsFactor of POWERFUL (same total compute as 100X)
     EXTREME(6, 2000, 400),
     INSANE(7, 2500, 500),
     SUPERMAN(8, 5000, 1000),
