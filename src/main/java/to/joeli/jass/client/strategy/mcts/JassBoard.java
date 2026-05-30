@@ -127,6 +127,19 @@ public class JassBoard implements Board {
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
+		Player currentPlayer = game.getCurrentPlayer();
+		if (currentPlayer.getCards().isEmpty())
+			logger.error("BUG: after determinization, current player {} (seatId={}) has no cards. " +
+							"mode={}, roundNumber={}, currentRoundPlayed={}, alreadyPlayed={}, availableCards={}, allPlayerCards={}",
+					currentPlayer.getName(), currentPlayer.getSeatId(),
+					game.getCurrentRoundMode(),
+					game.getCurrentRound().getRoundNumber(),
+					game.getCurrentRound().getPlayedCardsInOrder(),
+					game.getAlreadyPlayedCardsInOrder(),
+					availableCards,
+					game.getPlayers().stream()
+							.map(p -> p.getName() + ":" + p.getCards())
+							.collect(java.util.stream.Collectors.joining(", ")));
 	}
 
 	/**
@@ -164,7 +177,20 @@ public class JassBoard implements Board {
 			for (Mode mode : topTrumpfChoices)
 				moves.add(new TrumpfMove(player, mode));
 		} else {
-			if ((player.getCards().isEmpty())) throw new AssertionError("The current player's cards are empty");
+			if ((player.getCards().isEmpty())) {
+				logger.error("BUG: current player {} (seatId={}) has no cards in getMoves. " +
+								"mode={}, roundNumber={}, currentRoundPlayed={}, alreadyPlayed={}, availableCards={}, allPlayerCards={}",
+						player.getName(), player.getSeatId(),
+						game.getCurrentRoundMode(),
+						game.getCurrentRound().getRoundNumber(),
+						game.getCurrentRound().getPlayedCardsInOrder(),
+						game.getAlreadyPlayedCardsInOrder(),
+						availableCards,
+						game.getPlayers().stream()
+								.map(p -> p.getName() + ":" + p.getCards())
+								.collect(java.util.stream.Collectors.joining(", ")));
+				throw new AssertionError("The current player's cards are empty");
+			}
 
 			Set<Card> possibleCards = CardSelectionHelper.getCardsPossibleToPlay(EnumSet.copyOf(player.getCards()), game);
 
