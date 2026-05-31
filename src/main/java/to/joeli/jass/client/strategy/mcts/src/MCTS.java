@@ -34,7 +34,13 @@ public class MCTS {
 	private int numRuns;
 	private int numDeterminizations;
 
+	private final MctsStats stats = new MctsStats();
+
 	public static final Logger logger = LoggerFactory.getLogger(MCTS.class);
+
+	public MctsStats getStats() {
+		return stats;
+	}
 
 
 	/**
@@ -45,14 +51,19 @@ public class MCTS {
 	 * @return
 	 */
 	public Move runForTime(Board startingBoard, int numDeterminizations, long endingTime) throws MCTSException {
-		if (!rootParallelisationEnabled) {
-			logger.info("Only running one determinization");
-			return executeByTime(startingBoard, endingTime).getMove();
-		} else {
-			this.numDeterminizations = numDeterminizations;
-			logger.info("Running {} determinizations", numDeterminizations);
-			submitTimeTasks(startingBoard, endingTime);
-			return collectResultsAndGetFinalSelectedMove();
+		stats.reset();
+		try {
+			if (!rootParallelisationEnabled) {
+				logger.info("Only running one determinization");
+				return executeByTime(startingBoard, endingTime).getMove();
+			} else {
+				this.numDeterminizations = numDeterminizations;
+				logger.info("Running {} determinizations", numDeterminizations);
+				submitTimeTasks(startingBoard, endingTime);
+				return collectResultsAndGetFinalSelectedMove();
+			}
+		} finally {
+			logger.info(stats.summary());
 		}
 	}
 
@@ -70,14 +81,19 @@ public class MCTS {
 	 * @return
 	 */
 	public Move runForRuns(Board startingBoard, int numDeterminizations, long runs) throws MCTSException {
-		if (!rootParallelisationEnabled) {
-			logger.info("Only running one determinization :(");
-			return executeByRuns(startingBoard, runs).getMove();
-		} else {
-			this.numDeterminizations = numDeterminizations;
-			logger.info("Running {} determinizations :)", numDeterminizations);
-			submitRunsTasks(startingBoard, runs);
-			return collectResultsAndGetFinalSelectedMove();
+		stats.reset();
+		try {
+			if (!rootParallelisationEnabled) {
+				logger.info("Only running one determinization :(");
+				return executeByRuns(startingBoard, runs).getMove();
+			} else {
+				this.numDeterminizations = numDeterminizations;
+				logger.info("Running {} determinizations :)", numDeterminizations);
+				submitRunsTasks(startingBoard, runs);
+				return collectResultsAndGetFinalSelectedMove();
+			}
+		} finally {
+			logger.info(stats.summary());
 		}
 	}
 
@@ -101,6 +117,7 @@ public class MCTS {
 		for (int i = 0; i < runs; i++)
 			select(startingBoard, rootNode);
 		logger.debug("Ran {} runs in {}ms.", runs, System.currentTimeMillis() - startTime);
+		recordRootVisits(rootNode);
 		return finalSelection(rootNode);
 	}
 
@@ -127,7 +144,19 @@ public class MCTS {
 			numRuns += runCounter;
 		}
 		logger.debug("Ran {} runs in {}ms.", runCounter, System.currentTimeMillis() - startTime);
+		recordRootVisits(rootNode);
 		return finalSelection(rootNode);
+	}
+
+	private void recordRootVisits(Node rootNode) {
+		if (rootNode.getChildren() == null) return;
+		int rootPlayer = rootNode.getPlayer();
+		for (Node child : rootNode.getChildren()) {
+			double visits = child.getGames();
+			if (visits <= 0) continue;
+			double meanQ = child.getScores()[rootPlayer] / visits;
+			stats.recordRootChild(child.getMove(), visits, meanQ);
+		}
 	}
 
 	private Move collectResultsAndGetFinalSelectedMove() throws MCTSException {
@@ -246,6 +275,7 @@ public class MCTS {
 	 */
 	private BoardNodePair treePolicy(Board oldBoard, Node node) {
 		Board board = oldBoard.duplicate(false);
+		int depth = 0;
 
 		while (!board.gameOver()) {
 			if (!node.isRandomNode()) { // this is a regular node
@@ -257,6 +287,8 @@ public class MCTS {
 					Node temp = node.getUnvisitedChildren().remove(random.nextInt(node.getUnvisitedChildren().size()));
 					node.getChildren().add(temp);
 					board.makeMove(temp.getMove());
+					depth++;
+					stats.recordTreePolicy(depth, board.gameOver());
 					return new BoardNodePair(board, temp);
 				} else {
 					List<Node> bestNodes = findChildren(node, board, optimisticBias, pessimisticBias, explorationConstant);
@@ -266,12 +298,14 @@ public class MCTS {
 						// from a non-terminal node, so we conclude that
 						// all children must have been pruned, and that
 						// therefore there is no reason to continue.
+						stats.recordTreePolicy(depth, board.gameOver());
 						return new BoardNodePair(board, node);
 					}
 
 					Node finalNode = bestNodes.get(random.nextInt(bestNodes.size()));
 					node = finalNode;
 					board.makeMove(finalNode.getMove());
+					depth++;
 				}
 			} else { // this is a random node
 
@@ -297,9 +331,11 @@ public class MCTS {
 				Node selectedNode = node.getChildren().get(getRandomChildNodeIndex(board));
 				node = selectedNode;
 				board.makeMove(selectedNode.getMove());
+				depth++;
 			}
 		}
 
+		stats.recordTreePolicy(depth, true);
 		return new BoardNodePair(board, node);
 	}
 

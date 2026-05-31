@@ -301,24 +301,92 @@ UCB c-tuning is not a quality lever. To make the tree policy load-bearing, you'd
 shaped by something better than UCB (i.e., a policy prior via PUCT). That's the AlphaZero
 direction. See below.
 
-## Tree depth / breadth diagnostic — proposed
+## Tree-stats empirical findings — 256-game POWERFUL A/A baseline
 
-Before committing weeks to AZ, instrument MCTS to log:
+Instrumented `MctsStats` records, per move decision, tree-policy depth distribution, %
+playouts that reached end-of-game (tree exhausted remaining game space without rollout),
+and per-root-child visit% + mean Q. Aggregated across 256 games × 4 bots = 6789 move
+decisions, 38M total playouts. See `analyze_mcts_stats.py`.
 
-- Average depth reached per playout (across the tree, not just deepest leaf)
-- Visit-count distribution at the root (how concentrated vs uniform)
-- Average depth at which a node's visit count exceeds, say, 50
+### Tree depth
 
-What this tells you:
+- Mean tree-policy depth: **7.97 plies** (std 1.48, p99=11.3, max 12.8). Very consistent
+  across moves.
+- Per-move max depth: mean 18.6 (deepest line in any single iteration); p90=27, max=36
+  (full game).
+- Playout-weighted reached-end-of-game: **11.5%** overall.
 
-- **If trees already reach end-of-game on most branches at POWERFUL** → PUCT can't deepen
-  what's already maxed out. The structural argument for AZ doesn't apply in this codebase,
-  and the ceiling is something else (leaf noise, branching at choice points).
-- **If average depth is 2–4 with massive breadth at the root** → PUCT has plenty of room
-  to help by concentrating visits on promising branches. The AZ case is strong.
+### Per-move reached-end-of-game is sharply bimodal
 
-Few hours of instrumentation + 256-game RUNS-mode logging run. Should precede any commitment
-to a multi-week AZ implementation.
+| Bucket | % of moves |
+|---|---|
+| 0-5% (early/mid game, far from terminals) | 51.7% |
+| 5-25% | 18.3% |
+| 25-50% | 10.6% |
+| 50-75% | 7.2% |
+| 75-100% (late game, tree near-exhaustive) | 12.1% |
+
+The middle is sparse — moves are either "tree nowhere near terminals" or "tree mostly at
+terminals," not a smooth gradient.
+
+### Stratified by playout budget (game stage proxy)
+
+| Stage | mean depth | reached-end | top1-share |
+|---|---|---|---|
+| Early (high budget, ~33 remaining plies) | 7.30 | 0.0% | 41.6% |
+| Mid | 8.62 | 5.1% | 45.3% |
+| Late (low budget, ~10 remaining plies) | 8.07 | 48.5% | 55.6% |
+
+Effective depth fraction in early game ≈ 25% of remaining plies — tree is shallow relative
+to game horizon. Late game it's near-exhaustive.
+
+### Root-visit concentration
+
+- Top-1 share: mean 48%, median 47%
+- # candidate moves per position: mean 4.1, median 3
+- **Decisive (top1 ≥ 60%)**: 25.5% of all moves
+- **Close call (top2 within 10pp, both ≥ 30%)**: 23.9% of all moves
+
+### Close calls split ≈ 46% outcome-equivalent / 54% genuine
+
+Of the 1622 close-call positions, classified by `|Q_top1 - Q_top2|`:
+
+| |dQ| range | count | % of close calls |
+|---|---|---|---|
+| < 0.5 pts | 469 | 28.9% |
+| 0.5 – 2.0 | 275 | 17.0% |
+| 2.0 – 5.0 | 401 | 24.7% |
+| 5.0 – 10.0 | 319 | 19.7% |
+| ≥ 10.0 | 158 | 9.7% |
+
+- **Outcome-equivalent** (|dQ| < 2): 11.0% of all moves. PUCT can't help — the moves are
+  genuinely tied (AKQ-in-trumps and T98-loser-card type situations).
+- **Genuine close call** (|dQ| ≥ 2): 12.9% of all moves. PUCT's clearest addressable subset.
+- The 9.7% of close calls with |dQ| ≥ 10 (= 2.3% of all moves) are particularly striking:
+  substantial Q gap (6%+ of score range) yet visits are still ~50/50. With c=√2 effectively
+  zero, this means **determinizations strongly disagree** on which move is better — not
+  within-tree exploration, but across-tree variance.
+
+### What this means for the AZ / PUCT precondition
+
+| Class | % of moves | PUCT room? |
+|---|---|---|
+| Decisive (top1 ≥ 60%) | 25.5% | No — search converged |
+| Outcome-equivalent close call | 11.0% | No — moves are tied |
+| Genuine close call | 12.9% | **Yes — clearest case** |
+| Other non-decisive (30 ≤ top1 < 60%) | ~50.6% | Plausibly — deepen promising lines |
+
+**Mechanism update from this data:** The genuine close calls with non-trivial |dQ| reveal
+that across-tree disagreement (different determinizations preferring different moves) is a
+major source of root-visit dispersion, not just within-tree exploration noise. PUCT's value
+in this regime isn't only "concentrate visits on promising branches within a tree" — it's
+also **"bias all trees toward the structurally-better move consistently, reducing
+across-determinization disagreement."** A learned policy that systematically prefers the
+right side of close calls would shift the aggregated visit distribution even when no
+individual tree changes its decision.
+
+The precondition is met: ~63% of moves have at least some plausible room for PUCT to
+affect the outcome. The genuine close calls (12.9%) are the cleanest test case.
 
 ## AlphaZero-style policy + value, trained via self-play (TPU + JAX)
 

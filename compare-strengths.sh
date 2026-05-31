@@ -35,8 +35,8 @@ run_match() {
 # Build once upfront so parallel gradle runs don't race on compilation.
 ./gradlew classes
 
-# UCB ablation: sqrt(2) baseline vs various exploration constants.
-# Scores are raw (0-157), so sqrt(2)~1.41 is nearly pure exploitation; higher C adds exploration.
-for ucb in 10 30 100 300 1000 3000; do
-    run_match "Ucb${ucb}" "POWERFUL" "FLAT" "UcbSqrt2" "POWERFUL" "FLAT" "RUNS" "" "" "$ucb" ""
-done
+# A/A baseline for tree-stats instrumentation: both teams are vanilla POWERFUL.
+# Expected wash on score; the value is the [mcts-stats] log lines (depth, root-visits).
+# Extract stats only:
+#   grep "\[mcts-stats\]" /tmp/jass-powerful1-1.log | head
+run_match "Powerful1" "POWERFUL" "FLAT" "Powerful2" "POWERFUL" "FLAT" "RUNS"
