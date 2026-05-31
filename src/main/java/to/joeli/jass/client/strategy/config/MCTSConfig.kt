@@ -25,6 +25,13 @@ class MCTSConfig {
     var playoutSelectionPolicy: PlayoutSelectionPolicy? = null
     var trumpfNumCandidates = 3 // how many heuristic-ranked modes the trump MCTS considers
 
+    // Heuristic-prior PUCT experiment (IDEAS.md "Pre-AZ intermediate experiments" #1).
+    // When enabled, MCTS.findChildren uses Q + cPuct * P * sqrt(N) / (1 + n) instead of UCB1.
+    var puctEnabled = false
+    var puctC = 100.0
+    var puctAlpha = 0.7
+    var puctPriorPolicy: PlayoutSelectionPolicy? = null
+
     constructor() {
         // Different settings on local machine for faster testing
         if (System.getProperty("os.name") == "Mac OS X")

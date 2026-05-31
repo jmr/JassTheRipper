@@ -40,6 +40,10 @@ class MCTSHelper(private val mctsConfig: MCTSConfig) {
         mcts.setFinalSelectionPolicy(mctsConfig.finalSelectionPolicy)
         mcts.setHeuristicFunction(mctsConfig.heuristicFunction)
         mcts.setPlayoutSelectionPolicy(mctsConfig.playoutSelectionPolicy)
+        mcts.setPuctEnabled(mctsConfig.puctEnabled)
+        mcts.setPuctC(mctsConfig.puctC)
+        mcts.setPuctAlpha(mctsConfig.puctAlpha)
+        mcts.setPuctPriorPolicy(mctsConfig.puctPriorPolicy)
 
         // if we run by runs we want the threadPool to only have as many threads as there are cores available for maximal efficiency (no unnecessary scheduling overhead)
         if (mctsConfig.runMode === RunMode.RUNS)

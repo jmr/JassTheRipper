@@ -388,6 +388,202 @@ individual tree changes its decision.
 The precondition is met: ~63% of moves have at least some plausible room for PUCT to
 affect the outcome. The genuine close calls (12.9%) are the cleanest test case.
 
+## Pre-AZ intermediate experiments (cheaper bridges to AZ)
+
+Three intermediate experiments that share infrastructure with full AZ, each with its own
+go/no-go signal. Each one's failure is informative; each one's success is shippable.
+
+### 1. Heuristic-prior PUCT (no model needed)
+
+Replace UCB selection inside `MCTS.findChildren` with the PUCT formula:
+`Q(s,a) + c_puct · P(s,a) · √N(s) / (1 + N(s,a))`. Use one of the existing rollout
+heuristics (`LightJassPlayoutSelectionPolicy` or `HeavyJassPlayoutSelectionPolicy`) as the
+prior `P`:
+
+```
+P(a) = alpha                       if a == heuristic.getBestMove(board)
+     = (1 - alpha) / (n_legal - 1) otherwise
+```
+
+Defaults: `alpha ≈ 0.7`, `c_puct ≈ 100` (scaled for 0-157 reward range).
+
+**Purpose:** validate the PUCT plumbing in this codebase before investing in network
+training. The heuristic was previously used *only in rollouts* — wiring it into the *tree
+policy* is a new use that may or may not help.
+
+**Outcomes:**
+- Ties baseline → PUCT formula doesn't break anything, ready for network experiments.
+- Beats baseline → unused heuristic signal in tree policy was a real lever.
+- Loses → alpha too high (over-committing) or heuristic weaker than UCB's Q estimates. Tune
+  or move on.
+
+**Cost:** ~half-day of integration + a 256-game match. No new data, no training.
+
+#### Empirical: alpha=0.7 with LightJassPlayoutSelectionPolicy, 256 games RUNS
+
+Powerful 24589 vs Puct/alpha=0.7 17003. **t=-5.13, p<0.0001, sign 98W/158L.** ~30 pts/game
+loss for PUCT. Strongly negative.
+
+Three candidate diagnoses (in order of likelihood):
+
+1. **Alpha too high.** 70% prior weight on a single move is enormous; if the heuristic is
+   anti-correlated with truth even in some position types, PUCT funnels visits into bad
+   branches and Q-sum aggregation aggregates those bad-branch evaluations. UCB would self-
+   correct via Q feedback; PUCT's `P · √N / (1+n)` term keeps the wrong move attractive
+   even after Q has spoken.
+2. **Heuristic is anti-correlated with Q in close calls.** Heuristic picks the "obvious"
+   move (highest card, take the trick); MCTS knows the "non-obvious" move (schmieren,
+   ditch a useless card) is better. The prior actively pushes search *away* from the good
+   move in exactly the positions where it matters.
+3. **PUCT-vs-Q-sum aggregation mismatch (as flagged in the AZ section below).** Within-tree
+   visit shaping by PUCT vs across-tree Q-sum aggregation: a confident-wrong prior produces
+   consistent visit waste across all determinizations, and the aggregated Q reflects the
+   wasted search. UCB+Q-sum doesn't have this failure mode because UCB's exploration is
+   uniform.
+
+#### Empirical: alpha=0 (uniform prior, no heuristic), 256 games RUNS
+
+PuctAlpha0 20516 vs Powerful 20476. **t=0.029, p=0.98, sign 127W/129L.** Clean wash.
+
+**Diagnosis confirmed:** the 30-pt loss at alpha=0.7 was specifically because the heuristic
+is a misleading prior, not because the PUCT mechanism is broken. PUCT with uniform prior
+performs identically to UCB baseline — the structural argument for AZ is empirically
+intact in this codebase.
+
+This is the cleanest possible plumbing-validation outcome:
+- PUCT formula composes with Q-sum aggregation without pathology.
+- The `c · P · √N / (1+n)` selection mechanism is fine when `P` is neutral.
+- Both selection rules (UCB and PUCT-with-uniform) converge to ~equivalent visit
+  distributions when given equivalent exploration signals.
+
+**Bar established for (2) and (3):** Any learned prior must clearly beat uniform.
+Heuristic-with-high-weight clearly lost; uniform clearly ties; the trained policy net needs
+to land between "as good as uniform" (safe to deploy, no value) and "better than uniform"
+(the actual quality win).
+
+**Updated risk profile:**
+- **(2) surgical close-call tiebreaker:** safest next step. Limited blast radius — policy
+  net only intervenes in ~12.9% of moves (genuine close calls), and only among MCTS-
+  validated top candidates. Mediocre policy net at worst ties baseline in those positions.
+- **(3) supervised policy net as PUCT prior:** wider blast radius — applied at every node.
+  Need empirical evidence from (2) before committing. A noisy or partially-trained policy
+  net here could repeat the alpha=0.7 failure mode at a different scale.
+
+#### Empirical: alpha sweep with both heuristics (256 games each, RUNS)
+
+Followed up with a full 2×4 grid: `LightJassPlayoutSelectionPolicy` and
+`HeavyJassPlayoutSelectionPolicy` as priors at `alpha ∈ {0.1, 0.3, 0.5, 0.7}`.
+
+| alpha | Light pts/game | Heavy pts/game | Δ (H − L) |
+|---|---|---|---|
+| 0.0 | 0 (wash, p=0.98) | same code path | 0 |
+| 0.1 | -8.2 (p=0.13) | -12.5 (p=0.03) | -4.3 |
+| 0.3 | -7.0 (p=0.26) | -12.9 (p=0.02) | -5.9 |
+| 0.5 | -8.6 (p=0.12) | -7.0 (p=0.17) | +1.6 |
+| 0.7 | -29.6 (p<0.0001) | -13.0 (p=0.015) | **+16.6** |
+
+**Critical implementation detail clarified:** both `LightJassPlayoutSelectionPolicy` and
+`HeavyJassPlayoutSelectionPolicy` end in `chooseRandomCard(set)` — `getBestMove()` is
+*stochastic*, returning a random sample from a filtered set:
+- Light: random over `refineCardsWithJassKnowledge(possibleCards, game)` (~most legal moves)
+- Heavy: random over `getAdvisableCards(game, possibleCards)` (~1-3 cards after stechen/
+  schmieren/positional logic in `PerfectInformationGameSolver`)
+
+So the "prior" varies between PUCT selection calls. The *average* prior across calls,
+treating "the set" as a single category, ends up biasing for/against the whole set:
+- alpha < 1/n: average prior is biased *away* from the heuristic-favored set
+- alpha > 1/n: average prior is biased *toward* the heuristic-favored set
+- alpha ≈ 1/n: roughly uniform (for typical n=3 Jass positions, crossover at α≈0.33)
+
+Smaller filter set (Heavy) → more concentrated bias → harm/help amplified in both directions.
+
+**Shape of the curves:**
+- Light has a clean plateau (-7 to -9 across 0.1–0.5) and then a cliff to -30 at 0.7.
+- Heavy is much flatter (-7 to -13 across the full sweep). The high-alpha cliff is largely
+  absent — Heavy's stronger toward-bias on advisable cards offsets what would otherwise be
+  random-allocation harm at alpha=0.7.
+
+**Key empirical findings:**
+1. **Heuristic quality matters substantially in the toward-direction.** Heavy at alpha=0.7
+   loses 17 fewer pts/game than Light at alpha=0.7 (-13 vs -30). This is direct evidence
+   that better priors produce better PUCT performance, supporting AZ.
+2. **Stochastic sampling adds a ~7-13 pt/game noise floor** that no alpha setting overcomes.
+   Intrinsic to using `getBestMove()` (single sample) as a substitute for a probability
+   distribution.
+3. **No alpha+heuristic combination beats baseline.** Best result is Heavy at alpha=0.5
+   (-7 pts/game), statistically indistinguishable from baseline noise. So heuristic-prior
+   PUCT is not by itself a quality win.
+
+**Synthesis for the AZ direction:**
+
+A trained policy network has two structural advantages over `getBestMove`-style priors:
+- **No randomization noise.** Policy nets output a proper softmax distribution per state.
+  The ~7-13 pt sampling-noise floor we measured does not apply.
+- **Per-position specialization.** Heavy's `getAdvisableCards` applies the same rules
+  everywhere; a trained policy can learn position-specific patterns that hand-coded rules
+  can't capture.
+
+**Concrete bar for the trained policy net:** at PUCT operating regime (high alpha, toward-
+bias), it must beat Heavy by at least 13 pts/game just to break even with baseline, and
+substantially more to be a real quality win. Supervised training on MCTS visit
+distributions plausibly clears that bar; how comfortably is the empirical question for (2)
+and (3) below.
+
+**Net read:** moderately AZ-positive. The heuristic-prior PUCT experiments demonstrated that
+priors *can* matter (Heavy vs Light at alpha=0.7) and that the PUCT mechanism *is* fine
+(alpha=0 wash). They also established a concrete reference point (Heavy at alpha=0.5/0.7)
+that any trained-policy experiment can be compared against. The supervised policy net
+investment is reasonable, with realistic expectations: clear room to outperform heuristic,
+but not a free win.
+
+### 2. Surgical close-call tiebreaker with supervised policy net
+
+Train a small policy network on `(state, MCTS-visit-distribution)` pairs from logged
+POWERFUL self-play games. Don't integrate with PUCT. Instead, at root action selection in
+`vote()`, *if* MCTS shows a close call (top-2 visits within 10pp AND |Q_top1 - Q_top2| ≥ 2),
+defer to the policy net's pick. Otherwise use existing Q-sum.
+
+**Purpose:** isolate and test the central PUCT hypothesis ("does a learned policy
+systematically pick the right side of genuine close calls?") without committing to any
+within-MCTS changes.
+
+**Outcomes:**
+- Beats baseline → strong direct evidence for the close-call mechanism. Ship it as a
+  quality win regardless of whether full AZ comes next.
+- Ties / loses → the close-call mechanism isn't the lever, weakens the AZ case
+  substantially.
+
+**Cost:** 1–2 days for training pipeline + integration + 256-game match. Reuses the
+existing NeuralNetwork / Estimator class hierarchy.
+
+### 3. Supervised policy net as PUCT prior (full integration, no self-play)
+
+Combines (1) plumbing with (2) network: use the trained policy net from (2) as the PUCT
+prior `P(s,a)` instead of the heuristic. AlphaGo (not Zero) used this exact pattern.
+
+**Purpose:** test whether a learned policy at every node of the tree (not just at the root
+tiebreaker) gives quality lift beyond what the surgical tiebreaker achieves.
+
+**Outcomes:**
+- Beats (2) → the policy net is useful throughout the tree, not just at the root. Full AZ
+  becomes very compelling.
+- Ties (2) → most of the policy net's value was at the root tiebreaker. Full AZ likely
+  marginal; stick with the simpler architecture.
+
+**Cost:** ~1 day on top of (2). Re-uses (2)'s trained network.
+
+### Suggested order
+
+1. **(1) first** — free, validates plumbing.
+2. **(2) next** — most surgical empirical test of the close-call hypothesis. Either a
+   shippable win or a strong negative.
+3. **(3) only if (2) lands** — full PUCT integration with the trained net.
+4. **Full AZ** only if (3) shows headroom over (2). Self-play loop closes the cycle and
+   lets the policy net exceed POWERFUL.
+
+This decomposes the months-long AZ commitment into 2–4 individual experiments, each
+~1–3 days, each with its own go/no-go signal.
+
 ## AlphaZero-style policy + value, trained via self-play (TPU + JAX)
 
 Distinct from the thesis's DNN-based experiments — the structural innovation that wasn't

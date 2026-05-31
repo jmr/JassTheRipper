@@ -8,6 +8,9 @@ import to.joeli.jass.client.strategy.config.MCTSConfig;
 import to.joeli.jass.client.strategy.config.RunMode;
 import to.joeli.jass.client.strategy.config.RunsScaling;
 import to.joeli.jass.client.strategy.config.StrengthLevel;
+import to.joeli.jass.client.strategy.mcts.HeavyJassPlayoutSelectionPolicy;
+import to.joeli.jass.client.strategy.mcts.LightJassPlayoutSelectionPolicy;
+import to.joeli.jass.client.strategy.mcts.src.PlayoutSelectionPolicy;
 import to.joeli.jass.messages.type.SessionType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,6 +37,10 @@ import java.util.concurrent.Future;
  *   name (e.g. FAST, STRONG, POWERFUL, EXTREME). Default: POWERFUL (1000ms/move).
  *   --cards-estimator=&lt;episode&gt; load the cards neural network from the given episode (e.g. 0).
  *   --ucb=&lt;value&gt; UCB exploration constant (default: sqrt(2) ≈ 1.414).
+ *   --puct enable PUCT selection with a heuristic prior (default: heavy).
+ *   --puct-prior=light|heavy which playout-selection heuristic to use as the PUCT prior (default: heavy).
+ *   --puct-alpha=&lt;value&gt; PUCT prior weight on heuristic-best move (default: 0.7).
+ *   --puct-c=&lt;value&gt; PUCT exploration constant (default: 100.0).
  */
 public class Application {
 	private static final String BOT_NAME = "JassTheRipper";
@@ -69,6 +76,18 @@ public class Application {
 			mctsConfig.setRunsScaling(RunsScaling.valueOf(flags.get("runs-scaling")));
 		if (flags.containsKey("ucb"))
 			mctsConfig.setExplorationConstant(Double.parseDouble(flags.get("ucb")));
+		if (flags.containsKey("puct")) {
+			mctsConfig.setPuctEnabled(true);
+			String prior = flags.getOrDefault("puct-prior", "heavy").toLowerCase();
+			PlayoutSelectionPolicy priorPolicy = prior.equals("light")
+					? new LightJassPlayoutSelectionPolicy()
+					: new HeavyJassPlayoutSelectionPolicy();
+			mctsConfig.setPuctPriorPolicy(priorPolicy);
+		}
+		if (flags.containsKey("puct-alpha"))
+			mctsConfig.setPuctAlpha(Double.parseDouble(flags.get("puct-alpha")));
+		if (flags.containsKey("puct-c"))
+			mctsConfig.setPuctC(Double.parseDouble(flags.get("puct-c")));
 
 		Config config = new Config(mctsConfig);
 		if (flags.containsKey("cards-estimator"))

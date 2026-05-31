@@ -34,12 +34,33 @@ public class MCTS {
 	private int numRuns;
 	private int numDeterminizations;
 
+	private boolean puctEnabled = false;
+	private double puctC = 100.0;        // exploration constant for PUCT, scaled for 0-157 reward range
+	private double puctAlpha = 0.7;      // weight on heuristic-best move in the prior
+	private PlayoutSelectionPolicy puctPriorPolicy;
+
 	private final MctsStats stats = new MctsStats();
 
 	public static final Logger logger = LoggerFactory.getLogger(MCTS.class);
 
 	public MctsStats getStats() {
 		return stats;
+	}
+
+	public void setPuctEnabled(boolean puctEnabled) {
+		this.puctEnabled = puctEnabled;
+	}
+
+	public void setPuctC(double puctC) {
+		this.puctC = puctC;
+	}
+
+	public void setPuctAlpha(double puctAlpha) {
+		this.puctAlpha = puctAlpha;
+	}
+
+	public void setPuctPriorPolicy(PlayoutSelectionPolicy puctPriorPolicy) {
+		this.puctPriorPolicy = puctPriorPolicy;
 	}
 
 
@@ -437,6 +458,8 @@ public class MCTS {
 	 */
 	private List<Node> findChildren(Node node, Board board, double optimisticBias, double pessimisticBias,
 	                                double explorationConstant) {
+		if (puctEnabled) return findChildrenPuct(node, board, optimisticBias, pessimisticBias);
+
 		double bestValue = Double.NEGATIVE_INFINITY;
 		ArrayList<Node> bestNodes = new ArrayList<>();
 		for (Node s : node.getChildren()) {
@@ -454,6 +477,45 @@ public class MCTS {
 
 				bestValue = getBestValue(bestValue, tempBest, bestNodes, s);
 			}
+		}
+
+		return bestNodes;
+	}
+
+	/**
+	 * PUCT selection: Q(s,a) + c_puct * P(s,a) * sqrt(N(s)) / (1 + N(s,a)).
+	 * Prior P concentrates `puctAlpha` on the move the heuristic picks for this board,
+	 * spreads `1 - puctAlpha` uniformly across the others. If no prior policy is set or
+	 * `puctAlpha <= 0`, falls back to a uniform prior (useful for diagnosing whether
+	 * the PUCT mechanism itself works, independent of prior quality).
+	 */
+	private List<Node> findChildrenPuct(Node node, Board board, double optimisticBias, double pessimisticBias) {
+		List<Node> children = node.getChildren();
+		boolean useHeuristic = puctPriorPolicy != null && puctAlpha > 0.0;
+		Move heuristicBest = useHeuristic ? puctPriorPolicy.getBestMove(board) : null;
+		int nLegal = children.size();
+		double otherPrior = nLegal > 1 ? (1.0 - puctAlpha) / (nLegal - 1) : 1.0;
+		double uniformPrior = 1.0 / Math.max(1, nLegal);
+		double sqrtParentN = Math.sqrt(node.getGames() + 1);
+
+		double bestValue = Double.NEGATIVE_INFINITY;
+		ArrayList<Node> bestNodes = new ArrayList<>();
+		for (Node s : children) {
+			if (s.isPruned()) continue;
+			double q = s.getGames() > 0 ? s.getScores()[node.getPlayer()] / s.getGames() : 0.0;
+			double prior = heuristicBest == null
+					? uniformPrior
+					: (s.getMove().equals(heuristicBest) ? puctAlpha : otherPrior);
+			double tempBest = q
+					+ puctC * prior * sqrtParentN / (1.0 + s.getGames())
+					+ optimisticBias * s.getOpti()[node.getPlayer()]
+					+ pessimisticBias * s.getPess()[node.getPlayer()];
+
+			if (heuristicFunction != null) {
+				tempBest += heuristicFunction.heuristicFunction(board);
+			}
+
+			bestValue = getBestValue(bestValue, tempBest, bestNodes, s);
 		}
 
 		return bestNodes;
