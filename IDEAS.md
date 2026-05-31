@@ -1,6 +1,17 @@
 # Ideas
 
-## Thesis findings — already ruled out at ≥1000 rounds (do not re-test)
+## Goals (current priority order)
+
+1. **Quality.** Maximize bot strength against equal-strength baselines and humans.
+2. **Efficiency.** Once quality is at target, reduce compute/energy at deployment so e.g.
+   phones don't overheat — without sacrificing quality (or with minimal sacrifice).
+
+Negative results below are tagged as "not a *quality* lever" rather than "dead" — several
+findings (especially DNN-as-leaf-evaluator at modest iteration counts) may be revived as
+efficiency-mode levers later: "quality-equivalent at 10× fewer playouts" is a real win
+even if it can't beat full-compute MCTS on raw strength.
+
+## Thesis findings — already ruled out as quality levers at ≥1000 rounds
 
 Joel Niklaus's MSc thesis (`MSc__Joel_Niklaus.pdf`) ran these comparisons at 10 × 100 rounds
 (= 1000 games each). Treat as solid negatives unless the integration is suspected buggy
@@ -207,7 +218,7 @@ bag-of-cards structure, a new architecture buys little over option 2 at high eng
   k=1 had been *significantly worse* than baseline (which it wasn't). Useful only to
   rule out OOD compounding as the explanation for the small negative lean.
 
-**Conclusion:** AR direction is effectively dead with the current network. To revive,
+**Conclusion:** AR direction is not a quality lever with the current network. To revive,
 would need first to re-establish that the baseline CardsEstimator carries useful signal
 at 256+ games (the original thesis test at 1k was negative, but the integration may have
 been buggy in ways analogous to the 1-hot collapse bug found here). Option 2 (retraining
@@ -257,7 +268,7 @@ No effect within noise across 7 orders of magnitude of c.
 
 ### What the wash actually means
 
-The UCB c-tuning lever is genuinely dead in this codebase, but **not because exploration is
+The UCB c-tuning lever is not a quality lever in this codebase, but **not because exploration is
 useless in principle.** The mechanism by which c is neutralized:
 
 `MCTS.java:193` aggregates per-move scores across determinizations by **summing Q values
@@ -285,7 +296,7 @@ baseline; they're just locating where the transition happens, which has no opera
 
 ### Conclusion
 
-UCB c-tuning is dead. To make the tree policy load-bearing, you'd need to change the
+UCB c-tuning is not a quality lever. To make the tree policy load-bearing, you'd need to change the
 **aggregation method** (Q-sum → argmax-visits), which only works if visit distribution is
 shaped by something better than UCB (i.e., a policy prior via PUCT). That's the AlphaZero
 direction. See below.
@@ -396,4 +407,4 @@ Estimated 2–4 days for scaffolding on TPU+JAX, plus tuning:
 ### Precondition
 
 Run the tree-depth diagnostic above. If trees are already reaching end-of-game, PUCT can't
-deepen what's already maxed out and this whole direction is dead before it starts.
+deepen what's already maxed out, so the AZ quality lever wouldn't apply.
