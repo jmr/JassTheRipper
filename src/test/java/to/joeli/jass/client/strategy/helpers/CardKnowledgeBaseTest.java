@@ -87,6 +87,79 @@ public class CardKnowledgeBaseTest {
 	}
 
 	@Test
+	public void testDeterminizationOverconstrainedNeverLeavesZeroCardPlayer() {
+		// Regression: deletePlayerFromRemainingDistributions called deleteEventAndReBalance
+		// which silently returned false (no-op) when the distribution had only one possible
+		// player. If a player reached quota but was the sole possible holder of another card
+		// (overconstrained by suit-voiding inference), the main loop assigned that card to
+		// them again — leaving a different player with 0 cards → AssertionError in getMoves.
+		//
+		// Setup: player2 and player3 void clubs in rounds 0-2 (clubs led, they play off-suit).
+		// At round 8, CLUB_KING and CLUB_QUEEN are both forced to player1 ({player1:1.0}),
+		// but player1's quota = 1. Without the fix, player1 gets 2 cards, player3 gets 0.
+		//
+		// Card accounting for rounds 0-7 (32 cards, none of {HEART_ACE, CLUB_KING, CLUB_QUEEN, DIAMOND_SIX}):
+		// player0 always leads the highest remaining card of the led suit and wins every round.
+
+		// Round 0: clubs led; player2/3 play hearts → club void established.
+		obeAbeGame.makeMove(new Move(player0, Card.CLUB_ACE));
+		obeAbeGame.makeMove(new Move(player1, Card.CLUB_SEVEN));
+		obeAbeGame.makeMove(new Move(player2, Card.HEART_SIX));
+		obeAbeGame.makeMove(new Move(player3, Card.HEART_SEVEN));
+		obeAbeGame.startNextRound();
+		// Round 1: clubs led; player2/3 play diamonds (void confirmed).
+		obeAbeGame.makeMove(new Move(player0, Card.CLUB_JACK));
+		obeAbeGame.makeMove(new Move(player1, Card.CLUB_EIGHT));
+		obeAbeGame.makeMove(new Move(player2, Card.DIAMOND_SEVEN));
+		obeAbeGame.makeMove(new Move(player3, Card.DIAMOND_EIGHT));
+		obeAbeGame.startNextRound();
+		// Round 2: clubs led; player2/3 play diamonds (void confirmed).
+		obeAbeGame.makeMove(new Move(player0, Card.CLUB_TEN));
+		obeAbeGame.makeMove(new Move(player1, Card.CLUB_NINE));
+		obeAbeGame.makeMove(new Move(player2, Card.DIAMOND_NINE));
+		obeAbeGame.makeMove(new Move(player3, Card.DIAMOND_TEN));
+		obeAbeGame.startNextRound();
+		// Rounds 3-7: use up remaining cards.
+		obeAbeGame.makeMove(new Move(player0, Card.DIAMOND_ACE));
+		obeAbeGame.makeMove(new Move(player1, Card.DIAMOND_JACK));
+		obeAbeGame.makeMove(new Move(player2, Card.HEART_EIGHT));
+		obeAbeGame.makeMove(new Move(player3, Card.HEART_NINE));
+		obeAbeGame.startNextRound();
+		obeAbeGame.makeMove(new Move(player0, Card.DIAMOND_KING));
+		obeAbeGame.makeMove(new Move(player1, Card.DIAMOND_QUEEN));
+		obeAbeGame.makeMove(new Move(player2, Card.HEART_TEN));
+		obeAbeGame.makeMove(new Move(player3, Card.HEART_JACK));
+		obeAbeGame.startNextRound();
+		obeAbeGame.makeMove(new Move(player0, Card.HEART_KING));
+		obeAbeGame.makeMove(new Move(player1, Card.HEART_QUEEN));
+		obeAbeGame.makeMove(new Move(player2, Card.SPADE_SIX));
+		obeAbeGame.makeMove(new Move(player3, Card.SPADE_SEVEN));
+		obeAbeGame.startNextRound();
+		obeAbeGame.makeMove(new Move(player0, Card.SPADE_ACE));
+		obeAbeGame.makeMove(new Move(player1, Card.SPADE_EIGHT));
+		obeAbeGame.makeMove(new Move(player2, Card.SPADE_NINE));
+		obeAbeGame.makeMove(new Move(player3, Card.SPADE_TEN));
+		obeAbeGame.startNextRound();
+		obeAbeGame.makeMove(new Move(player0, Card.SPADE_KING));
+		obeAbeGame.makeMove(new Move(player1, Card.SPADE_JACK));
+		obeAbeGame.makeMove(new Move(player2, Card.SPADE_QUEEN));
+		obeAbeGame.makeMove(new Move(player3, Card.CLUB_SIX));
+		obeAbeGame.startNextRound();
+
+		// Round 8: player0 holds HEART_ACE. Others need CLUB_KING, CLUB_QUEEN, DIAMOND_SIX.
+		// Constraint: CLUB_KING and CLUB_QUEEN each have distribution {player1:1.0}
+		// (player2 and player3 voided clubs). quota=1 for all → overconstrained.
+		assertEquals(8, obeAbeGame.getCurrentRound().getRoundNumber());
+		Set<Card> availableCards = EnumSet.of(Card.HEART_ACE);
+		for (int i = 0; i < 100; i++) {
+			CardKnowledgeBase.sampleCardDeterminizationToPlayers(obeAbeGame, availableCards, null);
+			assertEquals(1, player1.getCards().size());
+			assertEquals(1, player2.getCards().size());
+			assertEquals(1, player3.getCards().size());
+		}
+	}
+
+	@Test
 	public void testInitCardKnowledge() {
 		final Game game = GameSessionBuilder.startedClubsGame();
 		final Map<Card, Distribution> cardKnowledge = CardKnowledgeBase.initCardKnowledge(game, game.getCurrentPlayer().getCards());

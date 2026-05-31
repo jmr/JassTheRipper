@@ -91,6 +91,23 @@ public class CardKnowledgeBase {
 
 		for (Player player : gameSession.getPlayersInInitialPlayingOrder())
 			if (player.getCards().isEmpty()) throw new AssertionError("Player " + player + " has no cards after determinization");
+		// Invariant: hands must be pairwise disjoint and union to all 36 cards.
+		assertHandsArePartition(gameSession.getPlayersInInitialPlayingOrder(), "trumpf-selection determinization");
+	}
+
+	private static void assertHandsArePartition(List<Player> players, String context) {
+		Set<Card> seen = EnumSet.noneOf(Card.class);
+		for (Player player : players) {
+			for (Card card : player.getCards()) {
+				if (!seen.add(card)) {
+					throw new IllegalStateException(String.format(
+							"INVARIANT VIOLATED in %s: card %s appears in multiple hands. Hands: %s",
+							context, card,
+							players.stream().map(p -> p.getName() + ":" + p.getCards())
+									.reduce((a, b) -> a + ", " + b).orElse("")));
+				}
+			}
+		}
 	}
 
 	/** Backward-compatible overload for the non-shifted case. */
@@ -190,7 +207,36 @@ public class CardKnowledgeBase {
 		if (player.getCards().size() == getNumberOfCardsToAdd(game, numberOfCards, player)) {
 			getStreamWithNotSampledDistributions(cardKnowledge)
 					.filter(entry -> entry.getValue().hasPlayer(player))
-					.forEach(entry -> entry.getValue().deleteEventAndReBalance(player));
+					.forEach(entry -> {
+						boolean deleted = entry.getValue().deleteEventAndReBalance(player);
+						if (!deleted) {
+							// If this is a current-player card (from availableCards), the
+							// numberOfCards quota (computed over the three *other* players) fires
+							// one card too early. The current player still needs this card — leave
+							// the singleton intact so the main loop assigns it next iteration.
+							if (availableCards.contains(entry.getKey())) return;
+
+							// Otherwise: player is already at quota but is the sole possible
+							// holder of this card. The constraint system is overconstrained (more
+							// cards forced to one player than their quota, likely from over-strict
+							// suit-voiding inference). Reopen to all other eligible players so the
+							// card still gets assigned and no player is left with 0 cards.
+							List<Player> candidates = game.getPlayers().stream()
+									.filter(p -> !p.equals(game.getCurrentPlayer())
+											&& !p.equals(player)
+											&& p.getCards().size() < getNumberOfCardsToAdd(game, numberOfCards, p))
+									.collect(Collectors.toList());
+							if (!candidates.isEmpty()) {
+								Map<Player, Float> newProbs = new HashMap<>();
+								float prob = 1f / candidates.size();
+								candidates.forEach(p -> newProbs.put(p, prob));
+								entry.setValue(new Distribution(newProbs, false));
+							} else {
+								// No eligible recipient — mark sampled to prevent an infinite loop.
+								entry.getValue().setSampled(true);
+							}
+						}
+					});
 		}
 	}
 
