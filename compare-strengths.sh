@@ -8,24 +8,25 @@ set -e
 cd "$(dirname "$0")"
 
 run_bot() {
-    local name=$1 strength=$2 team=$3 mode=$4 scaling=$5 log=$6 cards_ep=${7:-}
-    local cards_arg=""
+    local name=$1 strength=$2 team=$3 mode=$4 scaling=$5 log=$6 cards_ep=${7:-} ucb=${8:-}
+    local cards_arg="" ucb_arg=""
     [[ -n "$cards_ep" ]] && cards_arg=",--cards-estimator=$cards_ep"
+    [[ -n "$ucb" ]] && ucb_arg=",--ucb=$ucb"
     # < /dev/null: Gradle reads stdin, which suspends a backgrounded process (SIGTTIN) without it.
-    ./gradlew run -Pmyargs="--name=$name,--strength=$strength,--team=$team,--mode=$mode,--runs-scaling=$scaling,--quit${cards_arg}" < /dev/null > "$log" 2>&1 &
-    echo "  started $name ($strength, $mode, $scaling${cards_ep:+, cards=$cards_ep}) team=$team -> $log [pid $!]"
+    ./gradlew run -Pmyargs="--name=$name,--strength=$strength,--team=$team,--mode=$mode,--runs-scaling=$scaling,--quit${cards_arg}${ucb_arg}" < /dev/null > "$log" 2>&1 &
+    echo "  started $name ($strength, $mode, $scaling${cards_ep:+, cards=$cards_ep}${ucb:+, ucb=$ucb}) team=$team -> $log [pid $!]"
 }
 
 run_match() {
-    local name1=$1 strength1=$2 scaling1=$3 name2=$4 strength2=$5 scaling2=$6 mode=${7:-RUNS} cards1=${8:-} cards2=${9:-}
+    local name1=$1 strength1=$2 scaling1=$3 name2=$4 strength2=$5 scaling2=$6 mode=${7:-RUNS} cards1=${8:-} cards2=${9:-} ucb1=${10:-} ucb2=${11:-}
     local slug1 slug2
-    slug1=$(echo "$name1" | tr '[:upper:]' '[:lower:]')
-    slug2=$(echo "$name2" | tr '[:upper:]' '[:lower:]')
-    echo "=== $name1 ($scaling1) vs $name2 ($scaling2) [$mode] ==="
-    run_bot "$name1" "$strength1" "0" "$mode" "$scaling1" "/tmp/jass-${slug1}-1.log" "$cards1"
-    run_bot "$name1" "$strength1" "0" "$mode" "$scaling1" "/tmp/jass-${slug1}-2.log" "$cards1"
-    run_bot "$name2" "$strength2" "1" "$mode" "$scaling2" "/tmp/jass-${slug2}-1.log" "$cards2"
-    run_bot "$name2" "$strength2" "1" "$mode" "$scaling2" "/tmp/jass-${slug2}-2.log" "$cards2"
+    slug1=$(echo "$name1" | tr '[:upper:]' '[:lower:]' | tr -d '.')
+    slug2=$(echo "$name2" | tr '[:upper:]' '[:lower:]' | tr -d '.')
+    echo "=== $name1 (ucb=${ucb1:-sqrt2}) vs $name2 (ucb=${ucb2:-sqrt2}) [$mode] ==="
+    run_bot "$name1" "$strength1" "0" "$mode" "$scaling1" "/tmp/jass-${slug1}-1.log" "$cards1" "$ucb1"
+    run_bot "$name1" "$strength1" "0" "$mode" "$scaling1" "/tmp/jass-${slug1}-2.log" "$cards1" "$ucb1"
+    run_bot "$name2" "$strength2" "1" "$mode" "$scaling2" "/tmp/jass-${slug2}-1.log" "$cards2" "$ucb2"
+    run_bot "$name2" "$strength2" "1" "$mode" "$scaling2" "/tmp/jass-${slug2}-2.log" "$cards2" "$ucb2"
     wait
     echo "=== done: $name1 vs $name2 ==="
     echo
@@ -34,5 +35,8 @@ run_match() {
 # Build once upfront so parallel gradle runs don't race on compilation.
 ./gradlew classes
 
-# AutoRegCardEstK3 vs plain POWERFUL: iterative re-inference every 3 assignments (~9 network calls/det)
-run_match "AutoRegCardEstK3" "POWERFUL" "FLAT" "Powerful" "POWERFUL" "FLAT" "RUNS" "0" ""
+# UCB ablation: sqrt(2) baseline vs various exploration constants.
+# Scores are raw (0-157), so sqrt(2)~1.41 is nearly pure exploitation; higher C adds exploration.
+for ucb in 10 30 100 300 1000 3000; do
+    run_match "Ucb${ucb}" "POWERFUL" "FLAT" "UcbSqrt2" "POWERFUL" "FLAT" "RUNS" "" "" "$ucb" ""
+done

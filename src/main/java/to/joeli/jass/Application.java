@@ -33,6 +33,7 @@ import java.util.concurrent.Future;
  *   --strength=&lt;level&gt; where level is any {@link to.joeli.jass.client.strategy.config.StrengthLevel}
  *   name (e.g. FAST, STRONG, POWERFUL, EXTREME). Default: POWERFUL (1000ms/move).
  *   --cards-estimator=&lt;episode&gt; load the cards neural network from the given episode (e.g. 0).
+ *   --ucb=&lt;value&gt; UCB exploration constant (default: sqrt(2) ≈ 1.414).
  */
 public class Application {
 	private static final String BOT_NAME = "JassTheRipper";
@@ -66,6 +67,8 @@ public class Application {
 			mctsConfig.setRunMode(RunMode.valueOf(flags.get("mode")));
 		if (flags.containsKey("runs-scaling"))
 			mctsConfig.setRunsScaling(RunsScaling.valueOf(flags.get("runs-scaling")));
+		if (flags.containsKey("ucb"))
+			mctsConfig.setExplorationConstant(Double.parseDouble(flags.get("ucb")));
 
 		Config config = new Config(mctsConfig);
 		if (flags.containsKey("cards-estimator"))
