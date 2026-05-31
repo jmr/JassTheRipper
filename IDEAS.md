@@ -213,23 +213,9 @@ at 256+ games (the original thesis test at 1k was negative, but the integration 
 been buggy in ways analogous to the 1-hot collapse bug found here). Option 2 (retraining
 with partial-assignment inputs) is on hold pending that.
 
-## UCB exploration constant (empirical findings)
+## UCB exploration constant — likely real bug, effectively untested
 
-Benchmarked via duplicate-Jass Arena (swapped-cards pairs), EXTREME strength (2 s/move):
-
-| c | % of sqrt(2) score | result |
-|---|---|---|
-| 0 | 81.7% | clearly worse |
-| sqrt(2) ≈ 1.41 | baseline | — |
-| 157/sqrt(2) ≈ 111 | ~99% | tied |
-| 1000 | 100.3% | tied |
-| 10000 | incomplete | — |
-
-Conclusion: performance is flat across a very wide range of c once c > 0. The MCTS trees are likely too
-shallow (many determinizations, each with limited depth) for the UCB selection term to matter much.
-The c value is not a productive tuning lever with the current time-limited root-parallelisation setup.
-
-### Scale mismatch (likely real, not resolved)
+### Scale mismatch (the bug)
 
 `Node.upperConfidenceBound` computes `scores[parent.player] / games + c * sqrt(log(parent.games+1) / games)`,
 and `JassBoard.getScore` returns unnormalized team scores in the range 0–157. The standard
@@ -237,18 +223,39 @@ c = √2 is calibrated for rewards in [0, 1] — on the 0–157 scale, the explo
 typical visit counts is ~0.5 while exploitation differences are tens of points. So c=√2 is
 effectively zero exploration on this scale.
 
-The puzzle: c=0 *clearly* underperforms c=√2 (81.7%) despite both being essentially zero
-exploration in the formula. Likely explanation: unvisited children are expanded first by
-the tree policy regardless of c (FPU-like behavior), and the c=0 path may handle the
+The puzzle: c=0 *clearly* underperforms c=√2 in prior runs despite both being essentially
+zero exploration in the formula. Likely explanation: unvisited children are expanded first
+by the tree policy regardless of c (FPU-like behavior), and the c=0 path may handle the
 divide-by-zero / unvisited case differently. Worth verifying in `MCTS.findChildren`.
 
-Cleanest fix to try: normalize Q inside UCB (`Q / 157` or `Q / TOTAL_POINTS`) rather than
-scaling c. That makes the formula match the textbook precondition with c=√2 as designed.
-Mathematically equivalent to the c=111 row, but cleaner and less prone to follow-up bugs.
+### Why the prior c-tuning experiments don't disprove the bug
 
-**Status:** the c=111 / c=1000 rows above were too small N to detect a real effect (the
-typical ~30 pts/game stddev needs ≥200 games for moderate effects). Worth one 256-game
-RUNS-mode run on the normalized variant before concluding the c-tuning lever is truly dead.
+| c | result | methodology |
+|---|---|---|
+| 0 | 81.7% (clearly worse) | win-rate-style vs random |
+| sqrt(2) ≈ 1.41 | baseline | — |
+| 157/sqrt(2) ≈ 111 | ~99% | vs random |
+| 1000 | 100.3% | vs random |
+| 10000 | incomplete | — |
+
+These were benchmarked **vs a random opponent, not vs equal-strength POWERFUL baseline.**
+Against random, POWERFUL wins so much that win-rate / score-percentage saturates near 100%
+and ceiling effects make any improvement below ~5% invisible regardless of N. The "tied"
+rows do **not** mean "c=111 doesn't help" — they mean "we couldn't see it through the ceiling."
+
+The c=0 row is informative because it dropped below the ceiling. The c=111 / c=1000 rows
+are essentially uninformative.
+
+### The cleanest fix to try
+
+Normalize Q inside UCB (`Q / TOTAL_POINTS`) rather than scaling c. That makes the formula
+match the textbook precondition with c=√2 as designed. Mathematically equivalent to scaling
+c, but cleaner.
+
+**Status: open question.** Run a 256-game **vs equal-strength POWERFUL baseline** in
+RUNS mode with the normalized variant. This is the cheapest open lever in the doc and
+arguably should precede the tree-depth diagnostic, since "c was effectively 0" is itself
+a candidate explanation for the shallow-tree symptom.
 
 ## Tree depth / breadth diagnostic — proposed
 
