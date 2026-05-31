@@ -1,5 +1,29 @@
 # Ideas
 
+## Thesis findings — already ruled out at ≥1000 rounds (do not re-test)
+
+Joel Niklaus's MSc thesis (`MSc__Joel_Niklaus.pdf`) ran these comparisons at 10 × 100 rounds
+(= 1000 games each). Treat as solid negatives unless the integration is suspected buggy
+(see "DNN as value estimator inside MCTS" caveat below).
+
+- **ISMCTS substrate vs DMCTS:** ISMCTS underperformed DMCTS. Substrate is not the lever.
+- **CardsEstimator + sampling for belief:** p=0.046 (P-DMCTS vs I-DMCTS, variance *increased*),
+  p=0.17 (P-ISMCTS vs ISMCTS). No card-belief improvement found.
+- **Rule-based / heavy rollouts:** "Replacing the random rollout with a rule-based rollout
+  did not improve the performance of DMCTS." Heavy rollouts ruled out.
+- **DNN as value estimator (Section 12, Fig 12.1):** MSE on validation set: DNN Value ≈ 10
+  random rollouts; DNN Max Policy Rollout ≈ 1000 random rollouts; **100 MCTS iterations
+  beats both, and keeps improving with iterations while rollouts/DNN plateau.** At our
+  iteration counts (POWERFUL = thousands+), the network cannot compete with MCTS for leaf
+  value estimation. **Caveat:** this measured the DNN's value-prediction MSE standalone,
+  not the DNN wired as the MCTS *leaf evaluator* inside the search loop. The conclusion
+  ("net is worse than 100-iter MCTS at predicting value") still implies plugging it in as
+  leaf eval won't help.
+
+**What the thesis did NOT test:** DNN as *tree policy* via PUCT (the AZ structural
+innovation, distinct from the leaf-evaluator question). Self-play training of policy+value
+heads (the thesis's DNN was trained supervised on logged games). These remain unexplored.
+
 ## `& 3` in getBoundIndex + roundColor field cache — implemented, +15%
 
 Done: `getBoundIndex` changed from `% playersInInitialPlayingOrder.size()` to `& 3`; `roundColor`
@@ -204,3 +228,76 @@ Benchmarked via duplicate-Jass Arena (swapped-cards pairs), EXTREME strength (2 
 Conclusion: performance is flat across a very wide range of c once c > 0. The MCTS trees are likely too
 shallow (many determinizations, each with limited depth) for the UCB selection term to matter much.
 The c value is not a productive tuning lever with the current time-limited root-parallelisation setup.
+
+### Scale mismatch (likely real, not resolved)
+
+`Node.upperConfidenceBound` computes `scores[parent.player] / games + c * sqrt(log(parent.games+1) / games)`,
+and `JassBoard.getScore` returns unnormalized team scores in the range 0–157. The standard
+c = √2 is calibrated for rewards in [0, 1] — on the 0–157 scale, the exploration term at
+typical visit counts is ~0.5 while exploitation differences are tens of points. So c=√2 is
+effectively zero exploration on this scale.
+
+The puzzle: c=0 *clearly* underperforms c=√2 (81.7%) despite both being essentially zero
+exploration in the formula. Likely explanation: unvisited children are expanded first by
+the tree policy regardless of c (FPU-like behavior), and the c=0 path may handle the
+divide-by-zero / unvisited case differently. Worth verifying in `MCTS.findChildren`.
+
+Cleanest fix to try: normalize Q inside UCB (`Q / 157` or `Q / TOTAL_POINTS`) rather than
+scaling c. That makes the formula match the textbook precondition with c=√2 as designed.
+Mathematically equivalent to the c=111 row, but cleaner and less prone to follow-up bugs.
+
+**Status:** the c=111 / c=1000 rows above were too small N to detect a real effect (the
+typical ~30 pts/game stddev needs ≥200 games for moderate effects). Worth one 256-game
+RUNS-mode run on the normalized variant before concluding the c-tuning lever is truly dead.
+
+## Tree depth / breadth diagnostic — proposed
+
+Before committing weeks to AZ, instrument MCTS to log:
+
+- Average depth reached per playout (across the tree, not just deepest leaf)
+- Visit-count distribution at the root (how concentrated vs uniform)
+- Average depth at which a node's visit count exceeds, say, 50
+
+What this tells you:
+
+- **If trees already reach end-of-game on most branches at POWERFUL** → PUCT can't deepen
+  what's already maxed out. The structural argument for AZ doesn't apply in this codebase,
+  and the ceiling is something else (leaf noise, branching at choice points).
+- **If average depth is 2–4 with massive breadth at the root** → PUCT has plenty of room
+  to help by concentrating visits on promising branches. The AZ case is strong.
+
+Few hours of instrumentation + 256-game RUNS-mode logging run. Should precede any commitment
+to a multi-week AZ implementation.
+
+## AlphaZero-style policy + value, trained via self-play (TPU + JAX)
+
+Distinct from the thesis's DNN-based experiments — the structural innovation that wasn't
+tested is **PUCT with a learned policy head guiding tree expansion**. Plug the policy into
+the selection rule (replacing UCB) so visits concentrate on a priori promising branches.
+
+Why this is plausibly different from the thesis's negatives:
+
+- Thesis tested DNN as *rollout policy*, *leaf value estimator*, and *belief over hidden
+  cards* — all leaf-side. None helped at 1000 rounds.
+- Thesis did NOT test DNN as *tree policy* via PUCT. PUCT shapes the visit distribution,
+  not the leaf values — different lever, addresses the shallow-tree symptom.
+- Thesis's DNNs were trained supervised on logged games. AZ self-play generates targets
+  from MCTS-improved policies — qualitatively higher-quality training signal.
+
+Implementation path (estimated 2–4 days for scaffolding on TPU+JAX, plus tuning):
+
+1. JAX policy+value network (small transformer over card embeddings).
+2. Self-play loop: MCTS-with-PUCT generates games; (state, MCTS-visits, outcome) → training data.
+3. Model export (Flax → SavedModel) for Java-side inference via TF-Java (already in repo).
+4. Java-side MCTS modification: replace UCB with PUCT, query value at leaves.
+
+Risks:
+
+- Even with TPU compute, the long tail is *tuning* (self-play schedule, value/policy
+  weighting, exploration noise). Implementation in days; landing a clear win is months.
+- The thesis's broader conclusion ("DMCTS at scale beats DNN methods in this codebase") is
+  an a-priori-negative on this whole class of approach. PUCT is the specific lever that
+  wasn't tested, but the prior is still bearish.
+
+**Precondition before starting:** run the tree-depth diagnostic above. If trees are already
+reaching end-of-game, PUCT can't help and this whole direction is dead before it starts.
