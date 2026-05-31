@@ -262,6 +262,9 @@ public class TrumpfSelectionHelperTest {
 		assertEquals(undeUfe, obeAbe);
 	}
 
+	// TODO: this test is flaky / order-dependent — it passes in isolation but occasionally
+	// fails when run as part of the full suite, likely because MCTS trumpf selection is
+	// non-deterministic and prior tests affect thread-pool or RNG state. Investigate.
 	@Test
 	public void testClubsVersusDiamonds() {
 		Set<Card> cards = clubsVersusDiamonds;
