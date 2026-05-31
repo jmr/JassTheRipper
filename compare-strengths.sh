@@ -43,10 +43,14 @@ run_match() {
 # Build once upfront so parallel gradle runs don't race on compilation.
 ./gradlew classes
 
-# Alpha sweep with HeavyJassPlayoutSelectionPolicy as PUCT prior (now Application's default).
-# Comparison to the Light sweep (alpha=0 wash, 0.1-0.5 plateau at ~-8 pts/game, 0.7 at -30 pts/game)
-# tests whether heuristic quality changes the curve, or whether the harm is structural (non-uniform
-# prior amplified by Q-sum aggregation regardless of which heuristic).
-for alpha in 0.7; do
-    run_match "PuctH${alpha}" "POWERFUL" "FLAT" "Powerful" "POWERFUL" "FLAT" "RUNS" "" "" "" "" "$alpha" ""
-done
+# Strength-level comparison: do FAST and STRONG meaningfully underperform POWERFUL? If FAST or
+# STRONG are competitive with POWERFUL at much lower per-move compute, they're attractive for
+# bulk self-play data generation (e.g., policy-net training targets) — cheaper games for
+# similar-quality MCTS visit distributions. Configure the jass-server for ~1024 games to get
+# a tight estimate (per-game stddev ~35 pts → SE ~1 pt/game at 1024).
+run_match "Fast" "FAST" "FLAT" "Powerful" "POWERFUL" "FLAT" "RUNS"
+#run_match "Strong" "STRONG" "FLAT" "Powerful" "POWERFUL" "FLAT" "RUNS"
+# Sanity check: TEST is POWERFUL/40 in runs and ~half the determinizations. If even this is
+# a wash against POWERFUL, the methodology is suspect (we'd be unable to detect *any*
+# strength difference). Expected: clear loss for TEST, validating our SE estimates.
+run_match "Test" "TEST" "FLAT" "Powerful" "POWERFUL" "FLAT" "RUNS"

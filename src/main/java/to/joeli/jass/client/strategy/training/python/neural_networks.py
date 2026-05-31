@@ -40,6 +40,16 @@ def score(hid):
     return score
 
 
+def policy(hid):
+    """AlphaZero-style policy head: softmax over the 36 cards.
+
+    Output is a proper probability distribution; legal-move masking and renormalization
+    happen at inference time in PolicyEstimator.predictPriorOverLegal."""
+    pol = Dense(units=36, activation=activation)(hid)
+    pol = Softmax(name='policy')(pol)
+    return pol
+
+
 def define_cards_estimator_model():
     inp = input()
     hid = hidden(inp)
@@ -64,11 +74,25 @@ def define_score_estimator_model():
     return model
 
 
+def define_policy_estimator_model():
+    inp = input()
+    hid = hidden(inp)
+    out = policy(hid)
+
+    model = Model(inp, out)
+
+    model.summary()
+
+    return model
+
+
 def define_separate_model(network_type):
     if network_type == "cards/":
         return define_cards_estimator_model()
     if network_type == "score/":
         return define_score_estimator_model()
+    if network_type == "policy/":
+        return define_policy_estimator_model()
     else:
         print("Please define a valid network type!")
 

@@ -18,4 +18,5 @@ enum class NetworkType constructor(
 ) {
     CARDS("cards/", "serving_default_input:0", "StatefulPartitionedCall_1:0"),
     SCORE("score/", "serving_default_input:0", "StatefulPartitionedCall_1:0"),
+    POLICY("policy/", "serving_default_input:0", "StatefulPartitionedCall_1:0"),
 }

@@ -48,7 +48,9 @@ def train(episode_padded, network_type):
         else:
             model = define_separate_model(network_type)
             optimizer = Adam()
-            loss = 'categorical_crossentropy' if network_type == 'cards/' else 'mse'
+            # cards: softmax over players per card; policy: softmax over cards; both categorical.
+            # score: scalar regression.
+            loss = 'categorical_crossentropy' if network_type in ('cards/', 'policy/') else 'mse'
             model.compile(loss=loss, optimizer=optimizer,
                           metrics=['acc', 'mae'])
             print("\nCompiled new model")
