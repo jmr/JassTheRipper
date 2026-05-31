@@ -228,7 +228,7 @@ zero exploration in the formula. Likely explanation: unvisited children are expa
 by the tree policy regardless of c (FPU-like behavior), and the c=0 path may handle the
 divide-by-zero / unvisited case differently. Worth verifying in `MCTS.findChildren`.
 
-### Why the prior c-tuning experiments don't disprove the bug
+### Prior win-rate-vs-random data (methodologically limited)
 
 | c | result | methodology |
 |---|---|---|
@@ -238,24 +238,57 @@ divide-by-zero / unvisited case differently. Worth verifying in `MCTS.findChildr
 | 1000 | 100.3% | vs random |
 | 10000 | incomplete | — |
 
-These were benchmarked **vs a random opponent, not vs equal-strength POWERFUL baseline.**
-Against random, POWERFUL wins so much that win-rate / score-percentage saturates near 100%
-and ceiling effects make any improvement below ~5% invisible regardless of N. The "tied"
-rows do **not** mean "c=111 doesn't help" — they mean "we couldn't see it through the ceiling."
+These were benchmarked **vs a random opponent.** Against random, POWERFUL wins so much that
+win-rate saturates near 100% and ceiling effects make any improvement below ~5% invisible.
+The c=0 row dropped below the ceiling so it's informative; the c=111 / c=1000 rows are not.
 
-The c=0 row is informative because it dropped below the ceiling. The c=111 / c=1000 rows
-are essentially uninformative.
+### 256-game sweep vs equal-strength POWERFUL baseline (proper N, proper opponent)
 
-### The cleanest fix to try
+| c    | result |
+|------|--------|
+| 10   | wash |
+| 30   | wash |
+| 100  | wash |
+| 300  | wash |
+| 1000 | wash |
 
-Normalize Q inside UCB (`Q / TOTAL_POINTS`) rather than scaling c. That makes the formula
-match the textbook precondition with c=√2 as designed. Mathematically equivalent to scaling
-c, but cleaner.
+All five values, against c=√2 default, RUNS mode, 256 games each (128 swapped-deal pairs).
+No effect within noise across 7 orders of magnitude of c.
 
-**Status: open question.** Run a 256-game **vs equal-strength POWERFUL baseline** in
-RUNS mode with the normalized variant. This is the cheapest open lever in the doc and
-arguably should precede the tree-depth diagnostic, since "c was effectively 0" is itself
-a candidate explanation for the shallow-tree symptom.
+### What the wash actually means
+
+The UCB c-tuning lever is genuinely dead in this codebase, but **not because exploration is
+useless in principle.** The mechanism by which c is neutralized:
+
+`MCTS.java:193` aggregates per-move scores across determinizations by **summing Q values
+(`getScoreForCurrentPlayer()`), not by summing visit counts.** AlphaZero-style argmax-visits
+selection would make within-tree visit distribution load-bearing. Q-sum aggregation makes it
+*almost irrelevant* — within-tree UCB exploration shapes which leaves get visited (so it
+affects Q estimates), but the action-selection layer is dominated by aggregated mean Q
+across many determinizations, which washes out per-tree tree-policy differences.
+
+So at c=√2 (focused) vs c=1000 (near-uniform within each tree), you get similar move
+rankings because (a) the best move's Q dominates in either regime once you average over many
+determinizations, and (b) the FPU-style expand-untried-first mechanism in `findChildren`
+already provides breadth-1 exploration regardless of c.
+
+### Why c=0 is uniquely broken (the apparent "discontinuity")
+
+c=0 is the one regime where any positive c isn't. Mechanism: after every child has been
+visited once (via FPU), c=0 makes the UCB term exactly zero, so the next-most-visits go
+entirely to the child with the highest single-rollout Q estimate. That move gets all
+subsequent visits and the others are abandoned with one noisy sample each. At c=0.01,
+the exploration term is tiny but nonzero, which is enough to occasionally revisit the
+alternatives and refine their Q estimates. So the practically meaningful transition is
+between c=0 and c=ε — not a smooth curve sliding into c=√2. c=0.1 / c=0.3 would also tie
+baseline; they're just locating where the transition happens, which has no operational value.
+
+### Conclusion
+
+UCB c-tuning is dead. To make the tree policy load-bearing, you'd need to change the
+**aggregation method** (Q-sum → argmax-visits), which only works if visit distribution is
+shaped by something better than UCB (i.e., a policy prior via PUCT). That's the AlphaZero
+direction. See below.
 
 ## Tree depth / breadth diagnostic — proposed
 
@@ -279,10 +312,35 @@ to a multi-week AZ implementation.
 ## AlphaZero-style policy + value, trained via self-play (TPU + JAX)
 
 Distinct from the thesis's DNN-based experiments — the structural innovation that wasn't
-tested is **PUCT with a learned policy head guiding tree expansion**. Plug the policy into
-the selection rule (replacing UCB) so visits concentrate on a priori promising branches.
+tested is **PUCT with a learned policy head guiding tree expansion** combined with
+**argmax-visits action selection** (instead of the current Q-sum aggregation).
 
-Why this is plausibly different from the thesis's negatives:
+### Background: PUCT vs UCB, and Q-sum vs argmax-visits
+
+**UCB1 (current):** at node s, select child a maximizing `Q(s,a) + c · √(ln N(s) / n(s,a))`.
+Exploration is uniform across children — every untried/under-visited child gets a bonus
+purely as a function of visit count.
+
+**PUCT (AlphaZero):** at node s, select child a maximizing
+`Q(s,a) + c · P(a|s) · √N(s) / (1 + n(s,a))`, where `P(a|s)` is the policy network's prior
+over actions. Exploration is **non-uniform** — children the policy thinks are good get more
+exploration bonus, children the policy thinks are bad get almost none. Same Q exploitation
+term; the difference is entirely in *where the exploration goes.*
+
+The √N(s) / (1+n(s,a)) shape vs √(ln N / n) also has different growth properties (PUCT
+grows faster early, slower late), but the load-bearing change is the policy-weighted
+exploration.
+
+**Q-sum aggregation (current, `MCTS.java:193`):** after all root-parallelized trees finish,
+for each candidate move m: sum `getScoreForCurrentPlayer()` across all leaf nodes of all
+trees, then argmax. Move chosen ≈ "move with the highest aggregated mean Q across
+determinizations."
+
+**Argmax-visits aggregation (AlphaZero):** after MCTS, pick the move with the most root
+visits. This only produces a sensible policy if the *tree policy concentrates visits on the
+best move* — which requires good Q estimates AND good exploration shaping (i.e., PUCT).
+
+### Why this is plausibly different from the thesis's negatives
 
 - Thesis tested DNN as *rollout policy*, *leaf value estimator*, and *belief over hidden
   cards* — all leaf-side. None helped at 1000 rounds.
@@ -291,20 +349,51 @@ Why this is plausibly different from the thesis's negatives:
 - Thesis's DNNs were trained supervised on logged games. AZ self-play generates targets
   from MCTS-improved policies — qualitatively higher-quality training signal.
 
-Implementation path (estimated 2–4 days for scaffolding on TPU+JAX, plus tuning):
+### The aggregation question
+
+The 256-game UCB sweep showed Q-sum aggregation washes out within-tree tree-policy
+differences (c=√2 and c=1000 tie at 256 games). PUCT-without-changing-aggregation would
+likely tie similarly — the policy prior would shape visits within each tree, but the
+Q-sum across many determinizations would average it back out.
+
+So the real AZ commitment is *both* PUCT (tree policy) *and* argmax-visits (aggregation).
+Either alone is probably insufficient:
+
+- **Argmax-visits with UCB tree policy:** visits are still ~uniform within tree → argmax
+  picks a near-random move. Worse than baseline.
+- **PUCT with Q-sum aggregation:** policy concentrates within tree but aggregation washes
+  it out. Probably no better than baseline.
+- **PUCT + argmax-visits + Dirichlet noise at root:** the canonical AlphaZero loop.
+
+This makes the implementation path more invasive than "just plug a network in."
+
+### Implementation path
+
+Estimated 2–4 days for scaffolding on TPU+JAX, plus tuning:
 
 1. JAX policy+value network (small transformer over card embeddings).
 2. Self-play loop: MCTS-with-PUCT generates games; (state, MCTS-visits, outcome) → training data.
 3. Model export (Flax → SavedModel) for Java-side inference via TF-Java (already in repo).
-4. Java-side MCTS modification: replace UCB with PUCT, query value at leaves.
+4. Java-side MCTS modifications:
+   - Replace UCB selection with PUCT in `Node.upperConfidenceBound` / `MCTS.findChildren`.
+   - Replace Q-sum action selection in `MCTS.java:193` with summed root visit counts.
+   - Add Dirichlet noise at the root for exploration during self-play.
+   - Query value net at leaves (replacing or augmenting rollouts).
 
-Risks:
+### Risks
 
 - Even with TPU compute, the long tail is *tuning* (self-play schedule, value/policy
-  weighting, exploration noise). Implementation in days; landing a clear win is months.
+  weighting, exploration noise, PUCT c, Dirichlet α). Implementation in days; landing a
+  clear win is months.
 - The thesis's broader conclusion ("DMCTS at scale beats DNN methods in this codebase") is
   an a-priori-negative on this whole class of approach. PUCT is the specific lever that
   wasn't tested, but the prior is still bearish.
+- Aggregation-switch risk: with bad policy net early in training, argmax-visits will be
+  worse than Q-sum. There's no smooth interpolation between the two — you commit to
+  argmax-visits and hope the policy net converges to something useful before competitive
+  evaluation.
 
-**Precondition before starting:** run the tree-depth diagnostic above. If trees are already
-reaching end-of-game, PUCT can't help and this whole direction is dead before it starts.
+### Precondition
+
+Run the tree-depth diagnostic above. If trees are already reaching end-of-game, PUCT can't
+deepen what's already maxed out and this whole direction is dead before it starts.
