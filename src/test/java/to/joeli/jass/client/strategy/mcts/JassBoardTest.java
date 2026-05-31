@@ -5,6 +5,7 @@ import org.junit.Test;
 import to.joeli.jass.client.game.*;
 import to.joeli.jass.client.strategy.helpers.CardKnowledgeBase;
 import to.joeli.jass.client.strategy.helpers.CardSelectionHelper;
+import to.joeli.jass.client.strategy.helpers.GameSessionBuilder;
 import to.joeli.jass.client.strategy.mcts.src.CallLocation;
 import to.joeli.jass.game.Trumpf;
 import to.joeli.jass.game.cards.Card;
@@ -13,6 +14,7 @@ import to.joeli.jass.game.mode.Mode;
 
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Set;
 
 import static java.util.Arrays.asList;
@@ -127,5 +129,34 @@ public class JassBoardTest {
 		assertTrue(impossibleCardsForPlayer.contains(Card.DIAMOND_QUEEN));
 		assertTrue(impossibleCardsForPlayer.contains(Card.DIAMOND_KING));
 		assertTrue(impossibleCardsForPlayer.contains(Card.DIAMOND_ACE));
+	}
+
+	@Test
+	public void testDuplicateFalsePreservesTrumpfDeterminization() {
+		// Regression: before the fix, constructTrumpfSelectionJassBoard() unconditionally
+		// called sampleCardDeterminizationToPlayersInTrumpfSelection(), and duplicate() called
+		// that factory regardless of newRandomCards. So every tree-policy duplicate(false) got
+		// a fresh random deal, meaning stored tree moves referenced (player, card) pairs from
+		// a stale determinization. Cards were silently un-removable, and the same card could
+		// end up in two players' hands and appear in Round.moves twice.
+		//
+		// With the fix: duplicate(false) only copies; determinization happens only on
+		// duplicate(true), matching the card-play pattern.
+		GameSession gameSession = GameSessionBuilder.newSession().createGameSession();
+		Set<Card> availableCards = gameSession.getTrumpfSelectingPlayer().getCards();
+
+		JassBoard root = JassBoard.constructTrumpfSelectionJassBoard(
+				availableCards, gameSession, false, false, false, null, null);
+
+		// MCTSTask: one determinization per task
+		JassBoard task = (JassBoard) root.duplicate(true);
+		List<Set<Card>> handsAfterDeterminize = task.snapshotPlayerCards();
+
+		// Tree policy: duplicate(false) must NOT re-randomize
+		JassBoard treePolicy = (JassBoard) task.duplicate(false);
+		List<Set<Card>> handsAfterTreePolicy = treePolicy.snapshotPlayerCards();
+
+		assertEquals("duplicate(false) in trumpf selection must preserve the determinization, not re-randomize",
+				handsAfterDeterminize, handsAfterTreePolicy);
 	}
 }

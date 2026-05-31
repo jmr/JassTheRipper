@@ -75,9 +75,12 @@ public class JassBoard implements Board {
 	}
 
 	public static JassBoard constructTrumpfSelectionJassBoard(Set<Card> availableCards, GameSession gameSession, boolean shifted, boolean cheating, boolean hardPruningEnabled, ScoreEstimator scoreEstimator, CardsEstimator cardsEstimator, int trumpfNumCandidates) {
+		// NOTE: determinization is NOT done here. MCTSTask triggers it via duplicate(true).
+		// Subsequent duplicate(false) calls in treePolicy must NOT re-determinize, otherwise
+		// stored tree moves reference player+card combinations from a stale determinization.
+		// See: testDuplicateFalsePreservesTrumpfDeterminization
 		JassBoard jassBoard = new JassBoard(EnumSet.copyOf(availableCards), new GameSession(gameSession), shifted, null, cheating, hardPruningEnabled, scoreEstimator, cardsEstimator);
 		jassBoard.trumpfNumCandidates = trumpfNumCandidates;
-		jassBoard.sampleCardDeterminizationToPlayersInTrumpfSelection();
 		return jassBoard;
 	}
 
@@ -149,8 +152,12 @@ public class JassBoard implements Board {
 	 */
 	@Override
 	public Board duplicate(boolean newRandomCards) {
-		if (isChoosingTrumpf())
-			return constructTrumpfSelectionJassBoard(availableCards, gameSession, shifted, cheating, hardPruningEnabled, scoreEstimator, cardsEstimator, trumpfNumCandidates);
+		if (isChoosingTrumpf()) {
+			JassBoard jassBoard = constructTrumpfSelectionJassBoard(availableCards, gameSession, shifted, cheating, hardPruningEnabled, scoreEstimator, cardsEstimator, trumpfNumCandidates);
+			if (newRandomCards)
+				jassBoard.sampleCardDeterminizationToPlayersInTrumpfSelection();
+			return jassBoard;
+		}
 
 		JassBoard jassBoard = constructCardSelectionJassBoard(availableCards, game, cheating, hardPruningEnabled, scoreEstimator, cardsEstimator);
 		if (newRandomCards)
@@ -301,6 +308,16 @@ public class JassBoard implements Board {
 		}
 		if (game == null) throw new AssertionError();
 		return game.getCurrentPlayer();
+	}
+
+	// Package-private: used by JassBoardTest to verify determinization invariants.
+	List<Set<Card>> snapshotPlayerCards() {
+		List<Player> players = isChoosingTrumpf()
+				? gameSession.getPlayersInInitialPlayingOrder()
+				: game.getPlayers();
+		return players.stream()
+				.map(p -> EnumSet.copyOf(p.getCards()))
+				.collect(java.util.stream.Collectors.toList());
 	}
 
 	@Override
