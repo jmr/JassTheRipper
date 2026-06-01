@@ -52,7 +52,10 @@ public class RemoteGame implements Game {
 			ClientUpgradeRequest request = new ClientUpgradeRequest();
 			client.connect(socket, uri, request);
 			logger.debug("Connecting to: {}", uri);
-			socket.awaitClose(closeTimeoutMin, TimeUnit.MINUTES);
+			boolean closed = socket.awaitClose(closeTimeoutMin, TimeUnit.MINUTES);
+			if (!closed) {
+				logger.warn("WebSocket close timeout after {} minutes — forcing disconnect", closeTimeoutMin);
+			}
 		} catch (Exception e) {
 			logger.debug("{}", e);
 		} finally {
