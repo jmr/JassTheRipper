@@ -22,6 +22,13 @@ import static to.joeli.jass.messages.type.SessionChoice.ADVISOR;
 import static to.joeli.jass.messages.type.SessionChoice.AUTOJOIN;
 import static java.util.stream.Collectors.toList;
 
+/**
+ * NOT thread-safe. All public methods must be called from a single thread at a
+ * time, and in the order messages arrive from the server.
+ * In production this is guaranteed by RemoteGameSocket's single-threaded executor
+ * (see RemoteGameSocket.onWebSocketMessage). In unit tests callers drive the socket
+ * directly and are responsible for correct ordering.
+ */
 public class GameHandler {
 	private final Player localPlayer;
 	private final SessionType sessionType;
@@ -146,8 +153,19 @@ public class GameHandler {
 		final RemoteCard remoteCard = playedCards.get(playerPosition);
 
 		final Player player = getCurrentRound().getPlayingOrder().getCurrentPlayer();
+		final to.joeli.jass.game.cards.Card card = Mapping.mapToCard(remoteCard);
 
-		final Move move = new Move(player, Mapping.mapToCard(remoteCard));
+		// Hypothesis: playing-order desync causes localPlayer's card to be attributed to
+		// a different player, so onMoveMade skips the removal and the card stays in hand.
+		if (!player.equals(localPlayer) && localPlayer.getCards().contains(card)) {
+			logger.error("PLAYORDER_DESYNC: card {} is in localPlayer({}) hand but attributed to player({}). " +
+							"playedCards.size={}, round={}, localPlayer.cards={}",
+					card, localPlayer.getName(), player.getName(),
+					playedCards.size(), getCurrentRound().getRoundNumber(),
+					localPlayer.getCards());
+		}
+
+		final Move move = new Move(player, card);
 		gameSession.makeMove(move);
 		localPlayer.onMoveMade(move); // NOTE: Maybe we could do this in the Round to make it easier.
 	}

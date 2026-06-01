@@ -10,6 +10,8 @@ import org.eclipse.jetty.websocket.api.annotations.WebSocket;
 
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 @WebSocket
@@ -17,6 +19,15 @@ public class RemoteGameSocket extends GameSocket {
 
     private static ObjectMapper objectMapper = new ObjectMapper();
     private final CountDownLatch closeLatch = new CountDownLatch(1);
+
+    // Single-threaded executor: Jetty callback threads submit tasks and return
+    // immediately; the executor runs them sequentially in submission order.
+    // This guarantees PLAYED_CARDS messages are processed before the
+    // REQUEST_CARD that follows them in the same WebSocket stream, even when
+    // MCTS holds the Jetty callback thread long enough for Jetty's EPC model
+    // to dispatch subsequent messages to different worker threads.
+    private final ExecutorService messageProcessor = Executors.newSingleThreadExecutor(
+            r -> { Thread t = new Thread(r, "jass-message-processor"); t.setDaemon(true); return t; });
 
     public RemoteGameSocket(GameHandler handler) {
         super(handler);
@@ -36,13 +47,14 @@ public class RemoteGameSocket extends GameSocket {
     public void onWebSocketClose(int statusCode, String reason) {
         super.onClose(statusCode, reason);
         closeLatch.countDown();
+        messageProcessor.shutdown();
     }
 
     @OnWebSocketMessage
     public void onWebSocketMessage(String msg) throws IOException {
         logger.trace("Received message: {}", msg);
         final Message message = read(msg, Message.class);
-        super.onMessage(message);
+        messageProcessor.execute(() -> onMessage(message));
     }
 
     private static <T> T read(String msg, Class<T> valueType) throws IOException {
