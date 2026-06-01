@@ -1,5 +1,7 @@
 package to.joeli.jass.client.game;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import to.joeli.jass.game.cards.Card;
 import to.joeli.jass.game.cards.CardSet;
 import to.joeli.jass.game.cards.Color;
@@ -10,6 +12,8 @@ import java.util.EnumSet;
 import java.util.List;
 
 public class Round {
+	private static final Logger logger = LoggerFactory.getLogger(Round.class);
+
 	private final Mode mode;
 	private final int roundNumber;
 	private final PlayingOrder playingOrder;
@@ -42,6 +46,7 @@ public class Round {
 			this.moves.add(copy);
 			this.playedCardBits |= 1L << copy.getPlayedCard().ordinal();
 		}
+		checkInvariants("Round copy ctor");
 	}
 
 	public void makeMove(Move move) {
@@ -53,6 +58,7 @@ public class Round {
 		if (roundColor == null) roundColor = move.getPlayedCard().getColor();
 		moves.add(move);
 		playedCardBits |= 1L << move.getPlayedCard().ordinal();
+		checkInvariants("Round.makeMove");
 		// NOTE: If this method were called here it would be a bit simpler. But it breaks tests
 		// move.getPlayer().onMoveMade(move);
 		playingOrder.moveToNextPlayer();
@@ -97,12 +103,47 @@ public class Round {
 		return roundColor;
 	}
 
+	private void checkInvariants(String context) {
+		// playedCardBits and moves must encode the same set of cards. If they diverge,
+		// Round.getWinner can produce a null winner (winning card not found in moves),
+		// which silently falls back to index 0 in PlayingOrder.createOrderStartingFromPlayer.
+		int bitCount = Long.bitCount(playedCardBits);
+		if (bitCount != moves.size()) {
+			throw new IllegalStateException(String.format(
+					"INVARIANT VIOLATED in %s: Long.bitCount(playedCardBits)=%d, moves.size()=%d. " +
+							"playedCards via bits=%s, moves cards=[%s], moves by player=[%s], " +
+							"playingOrder hands=[%s]",
+					context, bitCount, moves.size(),
+					CardSet.toEnumSet(playedCardBits),
+					moves.stream().map(m -> m.getPlayedCard().toString())
+							.reduce((a, b) -> a + ", " + b).orElse(""),
+					moves.stream().map(m -> m.getPlayer().getName() + "(seat=" + m.getPlayer().getSeatId() + ")->" + m.getPlayedCard())
+							.reduce((a, b) -> a + ", " + b).orElse(""),
+					playingOrder.getPlayersInInitialOrder().stream()
+							.map(p -> p.getName() + "(seat=" + p.getSeatId() + "):" + p.getCards())
+							.reduce((a, b) -> a + ", " + b).orElse("")));
+		}
+	}
+
 	public Player getWinner() {
 		Card winningCard = mode.determineWinningCard(playedCardBits, getRoundColor());
-		if (winningCard == null) return null;
+		if (winningCard == null) {
+			logger.warn("DESYNC: Round.getWinner — determineWinningCard returned null. " +
+							"mode={}, roundNumber={}, roundColor={}, playedCardBits={}, moves.size()={}",
+					mode, roundNumber, roundColor, playedCardBits, moves.size());
+			return null;
+		}
 		for (Move move : moves) {
 			if (winningCard == move.getPlayedCard()) return move.getPlayer();
 		}
+		logger.warn("DESYNC: Round.getWinner — winning card {} not found in moves. " +
+						"This indicates playedCardBits / moves divergence. " +
+						"mode={}, roundNumber={}, roundColor={}, playedCardBits bitcount={}, moves.size()={}, " +
+						"playedCards via bits={}, moves cards=[{}]",
+				winningCard, mode, roundNumber, roundColor,
+				Long.bitCount(playedCardBits), moves.size(),
+				CardSet.toEnumSet(playedCardBits),
+				moves.stream().map(m -> m.getPlayedCard().toString()).collect(java.util.stream.Collectors.joining(", ")));
 		return null;
 	}
 

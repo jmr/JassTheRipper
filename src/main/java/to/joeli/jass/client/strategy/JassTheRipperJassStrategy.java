@@ -137,6 +137,12 @@ TODO Make new experiments with the improvements so far:
 	public Mode chooseTrumpf(Set<Card> availableCards, GameSession session, boolean shifted) {
 		try {
 			final long startTime = System.nanoTime();
+			if (availableCards.size() != 9) {
+				throw new IllegalStateException(String.format(
+						"INVARIANT VIOLATED at chooseTrumpf: availableCards.size=%d, expected 9. " +
+								"availableCards=%s",
+						availableCards.size(), availableCards));
+			}
 			printCards(availableCards);
 
 			Mode mode = TrumpfSelectionHelper.getRandomMode(shifted);
@@ -196,6 +202,32 @@ TODO Make new experiments with the improvements so far:
 		final Game game = session.getCurrentGame();
 		try {
 			final long startTime = System.nanoTime();
+			// Card-conservation invariant: bot's hand size must match round position exactly.
+			// At chooseCard entry the bot hasn't played in the current round yet, so the
+			// expected size is 9 - roundNumber. If this fires, the bot's hand desynced from
+			// the actual game state — see CARD_DESYNC_BUG.md.
+			final int roundNumber = game.getCurrentRound().getRoundNumber();
+			final int expected = 9 - roundNumber;
+			if (availableCards.size() != expected) {
+				throw new IllegalStateException(String.format(
+						"INVARIANT VIOLATED at chooseCard: availableCards.size=%d but expected %d " +
+								"(roundNumber=%d). availableCards=%s, currentRoundPlayed=%s, alreadyPlayed=%s",
+						availableCards.size(), expected, roundNumber,
+						availableCards,
+						game.getCurrentRound().getPlayedCardsInOrder(),
+						game.getAlreadyPlayedCards()));
+			}
+			// Content invariant: no card in our hand should have been played already.
+			// A fire here means localPlayer.cards contains stale entries — see CARD_DESYNC_BUG.md.
+			final Set<Card> alreadyPlayedAtEntry = game.getAlreadyPlayedCards();
+			for (Card c : availableCards) {
+				if (alreadyPlayedAtEntry.contains(c)) {
+					throw new IllegalStateException(String.format(
+							"CONTENT INVARIANT VIOLATED at chooseCard: availableCards contains already-played card %s. " +
+									"availableCards=%s, alreadyPlayed=%s, roundNumber=%d",
+							c, availableCards, alreadyPlayedAtEntry, roundNumber));
+				}
+			}
 			printCards(availableCards);
 
 			final Set<Card> possibleCards = CardSelectionHelper.getCardsPossibleToPlay(availableCards, game);

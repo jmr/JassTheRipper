@@ -1,10 +1,14 @@
 package to.joeli.jass.client.game;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 public class PlayingOrder {
+	private static final Logger logger = LoggerFactory.getLogger(PlayingOrder.class);
 
 	private final List<Player> playersInInitialPlayingOrder;
 	private final int startingPlayerIndex;
@@ -15,10 +19,22 @@ public class PlayingOrder {
 	}
 
 	public static PlayingOrder createOrderStartingFromPlayer(List<Player> playersInPlayingOrder, Player startFrom) {
-		if (startFrom == null) return new PlayingOrder(playersInPlayingOrder, 0);
+		if (startFrom == null) {
+			logger.warn("DESYNC: PlayingOrder.createOrderStartingFromPlayer — startFrom is null. " +
+							"Falling back to index 0. playersInPlayingOrder={}",
+					playersInPlayingOrder);
+			return new PlayingOrder(playersInPlayingOrder, 0);
+		}
 		for (int i = 0; i < playersInPlayingOrder.size(); i++)
 			if (playersInPlayingOrder.get(i).equals(startFrom))
 				return new PlayingOrder(playersInPlayingOrder, i);
+		logger.warn("DESYNC: PlayingOrder.createOrderStartingFromPlayer — startFrom {} (id={}, identity={}) " +
+						"not equals-matched in playersInPlayingOrder. Falling back to index 0. " +
+						"players=[{}]",
+				startFrom.getName(), startFrom.getId(), System.identityHashCode(startFrom),
+				playersInPlayingOrder.stream()
+						.map(p -> p.getName() + "(id=" + p.getId() + ",identity=" + System.identityHashCode(p) + ")")
+						.reduce((a, b) -> a + ", " + b).orElse(""));
 		return new PlayingOrder(playersInPlayingOrder, 0);
 	}
 

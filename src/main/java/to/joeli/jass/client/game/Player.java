@@ -181,9 +181,23 @@ public class Player implements Comparable<Player> {
 
 	public void onMoveMade(Move move) {
 		if (this.equals(move.getPlayer())) {
-			if (!cards.remove(move.getPlayedCard()))
-				logger.error("The player {} did not have card {}", move.getPlayer(), move.getPlayedCard());
+			if (!cards.remove(move.getPlayedCard())) {
+				logger.error("DESYNC: Player {} (id={}, identity={}) had no card {} to remove. " +
+								"move.player id={}, identity={}, cards={}",
+						name, id, System.identityHashCode(this), move.getPlayedCard(),
+						move.getPlayer().getId(), System.identityHashCode(move.getPlayer()), cards);
+			}
+			// Always clear the bit. If cards.remove succeeded the bit was set; if it failed
+			// the bit was already 0 and this is a no-op. Either way cards and cardBits agree
+			// afterward.
 			cardBits &= ~(1L << move.getPlayedCard().ordinal());
+		}
+		// Invariant: a player's hand can never exceed 9 cards. Catches any path that adds
+		// cards without removing.
+		if (cards.size() > 9) {
+			throw new IllegalStateException(String.format(
+					"INVARIANT VIOLATED in Player.onMoveMade: %s now has %d cards (max 9). cards=%s",
+					name, cards.size(), cards));
 		}
 		jassStrategy.onMoveMade(move);
 	}
