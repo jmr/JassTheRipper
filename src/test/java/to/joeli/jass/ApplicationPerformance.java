@@ -21,6 +21,7 @@ class ApplicationPerformance {
 	public static final String LOCAL_URL = "ws://localhost:3000";
 
 	private final static String BOT_NAME = "performanceBot";
+	private static final int CLOSE_TIMEOUT_MIN = 120;
 
 	public static void main(String[] args) throws Exception {
 
@@ -58,7 +59,7 @@ class ApplicationPerformance {
 
 	private static RemoteGame startGame(String targetUrl, Player myLocalPlayer, SessionType sessionType) {
 
-		final RemoteGame remoteGame = new RemoteGame(targetUrl, myLocalPlayer, sessionType);
+		final RemoteGame remoteGame = new RemoteGame(targetUrl, myLocalPlayer, sessionType, "Java Client Session", 1, null, CLOSE_TIMEOUT_MIN);
 		remoteGame.start();
 		return remoteGame;
 	}

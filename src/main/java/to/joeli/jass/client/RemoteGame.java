@@ -16,25 +16,22 @@ import java.util.concurrent.TimeUnit;
 public class RemoteGame implements Game {
 
 	private static final Logger logger = LoggerFactory.getLogger(RemoteGame.class);
-	private static final int CLOSE_TIMEOUT_MIN = 120; // INFO: This is very important! The bot will terminate itself after that time. So do not set too low!
 	private final Player player;
 	private final String targetUrl;
 	private final SessionType sessionType;
 	private final String sessionName;
 	private final Integer chosenTeamIndex;
 	private final String advisedPlayerName;
+	private final int closeTimeoutMin;
 
-	public RemoteGame(String targetUrl, Player player, SessionType sessionType) {
-		this(targetUrl, player, sessionType, "Java Client Session", 1, null);
-	}
-
-	public RemoteGame(String targetUrl, Player player, SessionType sessionType, String sessionName, int chosenTeamIndex, String advisedPlayerName) {
+	public RemoteGame(String targetUrl, Player player, SessionType sessionType, String sessionName, int chosenTeamIndex, String advisedPlayerName, int closeTimeoutMin) {
 		this.targetUrl = targetUrl;
 		this.player = player;
 		this.sessionType = sessionType;
 		this.sessionName = sessionName;
 		this.chosenTeamIndex = chosenTeamIndex;
 		this.advisedPlayerName = advisedPlayerName;
+		this.closeTimeoutMin = closeTimeoutMin;
 	}
 
 	@Override
@@ -55,7 +52,7 @@ public class RemoteGame implements Game {
 			ClientUpgradeRequest request = new ClientUpgradeRequest();
 			client.connect(socket, uri, request);
 			logger.debug("Connecting to: {}", uri);
-			socket.awaitClose(CLOSE_TIMEOUT_MIN, TimeUnit.MINUTES);
+			socket.awaitClose(closeTimeoutMin, TimeUnit.MINUTES);
 		} catch (Exception e) {
 			logger.debug("{}", e);
 		} finally {

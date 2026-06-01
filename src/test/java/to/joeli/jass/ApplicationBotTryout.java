@@ -35,6 +35,7 @@ class ApplicationBotTryout {
 
 	//CHALLENGE2017: Set the number of opponent teams with random bots
 	private final static int NUMBER_OF_RANDOM_TEAMS = 0;
+	private static final int CLOSE_TIMEOUT_MIN = 120;
 
 	public static void main(String[] args) {
 		String url = LOCAL_URL;
@@ -77,7 +78,7 @@ class ApplicationBotTryout {
 
 	private static RemoteGame startGame(String targetUrl, Player myLocalPlayer, SessionType sessionType) {
 
-		final RemoteGame remoteGame = new RemoteGame(targetUrl, myLocalPlayer, sessionType);
+		final RemoteGame remoteGame = new RemoteGame(targetUrl, myLocalPlayer, sessionType, "Java Client Session", 1, null, CLOSE_TIMEOUT_MIN);
 		remoteGame.start();
 		return remoteGame;
 	}

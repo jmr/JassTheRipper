@@ -41,6 +41,7 @@ public class BenchmarkRunner {
 	private static final String LOCAL_URL = "ws://localhost:3000";
 
 	private static final String RESULT_DIRECTORY = "benchmarks";
+	private static final int CLOSE_TIMEOUT_MIN = 120;
 
 	/**
 	 * Evaluates the result of the last modified file in the benchmarks directory of the jass server.
@@ -246,7 +247,7 @@ public class BenchmarkRunner {
 	}
 
 	private static RemoteGame startGame(String targetUrl, Player myLocalPlayer, SessionType sessionType) {
-		final RemoteGame remoteGame = new RemoteGame(targetUrl, myLocalPlayer, sessionType);
+		final RemoteGame remoteGame = new RemoteGame(targetUrl, myLocalPlayer, sessionType, "Java Client Session", 1, null, CLOSE_TIMEOUT_MIN);
 		remoteGame.start();
 		return remoteGame;
 	}

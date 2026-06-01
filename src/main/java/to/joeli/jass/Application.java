@@ -41,6 +41,7 @@ import java.util.concurrent.Future;
  *   --puct-prior=light|heavy which playout-selection heuristic to use as the PUCT prior (default: heavy).
  *   --puct-alpha=&lt;value&gt; PUCT prior weight on heuristic-best move (default: 0.7).
  *   --puct-c=&lt;value&gt; PUCT exploration constant (default: 100.0).
+ *   --timeout=&lt;minutes&gt; WebSocket close timeout in minutes (default: 720 = 12h).
  */
 public class Application {
 	private static final String BOT_NAME = "JassTheRipper";
@@ -101,8 +102,9 @@ public class Application {
 			logger.info("Loaded cards estimator from episode {}", episode);
 		}
 
+		int closeTimeoutMin = Integer.parseInt(flags.getOrDefault("timeout", "720"));
 		Player player = new Player(name, strategy);
-		new RemoteGame(url, player, SessionType.SINGLE_GAME, session, team, advisedPlayer).start();
+		new RemoteGame(url, player, SessionType.SINGLE_GAME, session, team, advisedPlayer, closeTimeoutMin).start();
 		if (flags.containsKey("quit")) {
 			System.exit(0);
 		}
@@ -115,7 +117,7 @@ public class Application {
 		for (int teamIndex : teamIndices) {
 			final int ti = teamIndex;
 			futures.add(executorService.submit(() -> {
-				new RemoteGame(url, new Player(BOT_NAME, new JassTheRipperJassStrategy()), SessionType.SINGLE_GAME, "Java Client Session", ti, null).start();
+				new RemoteGame(url, new Player(BOT_NAME, new JassTheRipperJassStrategy()), SessionType.SINGLE_GAME, "Java Client Session", ti, null, 720).start();
 			}));
 			try {
 				Thread.sleep(500);
