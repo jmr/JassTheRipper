@@ -309,14 +309,20 @@ public class Arena {
 			Result result = playGame(trainMode.isSavingData());
 
 			logger.info("Result of game #{}: {}\n", i, result);
-			if (firstResult == null)
-				firstResult = result;
-			else {
-				int pairA = result.getTeamAScore().getScore() + firstResult.getTeamAScore().getScore();
-				int pairB = result.getTeamBScore().getScore() + firstResult.getTeamBScore().getScore();
-				resultLogger.info("{},{}", pairA, pairB);
-				pairDiffs.add((double) (pairA - pairB));
-				firstResult = null;
+			if (trainMode.isFairTournamentModeEnabled()) {
+				if (firstResult == null) {
+					firstResult = result;
+				} else {
+					int pairA = result.getTeamAScore().getScore() + firstResult.getTeamAScore().getScore();
+					int pairB = result.getTeamBScore().getScore() + firstResult.getTeamBScore().getScore();
+					resultLogger.info("{},{}", pairA, pairB);
+					pairDiffs.add((double) (pairA - pairB));
+					firstResult = null;
+				}
+			} else {
+				int diffA = result.getTeamAScore().getScore() - result.getTeamBScore().getScore();
+				resultLogger.info("{}", diffA);
+				pairDiffs.add((double) diffA);
 			}
 
 			if (trainMode.isSavingData())
