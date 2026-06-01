@@ -388,6 +388,37 @@ individual tree changes its decision.
 The precondition is met: ~63% of moves have at least some plausible room for PUCT to
 affect the outcome. The genuine close calls (12.9%) are the cleanest test case.
 
+## Strength curve: FAST / STRONG / EXTREME vs POWERFUL
+
+Characterises the saturation curve around POWERFUL. All matches are RUNS mode, FLAT
+scaling, 2v2 on a running jass-server (ortho24 tournament, ~9984 games per match).
+Server reports cumulative team scores and per-game sign/t stats.
+
+| Matchup | Games | FAST/STRONG/EXTREME score | POWERFUL score | Δ pts/game | p (t-test) | p (sign) |
+|---|---|---|---|---|---|---|
+| FAST vs POWERFUL | 9984 | 788 807 (≈79.0/game) | 821 107 (≈82.2/game) | −3.2 | 0.0004 | 0.0038 |
+| STRONG vs POWERFUL | 10240 | 817 349 (≈79.8/game) | 836 631 (≈81.7/game) | −1.9 | 0.0000 | 0.0000 |
+| EXTREME vs POWERFUL | 10240 | 828 530 (≈80.9/game) | 825 350 (≈80.6/game) | +3.2 | 0.4700 | 0.0042 |
+| INSANE vs POWERFUL | — | — | — | — | — | — |
+| SUPERMAN vs POWERFUL | — | — | — | — | — | — |
+| IRONMAN vs POWERFUL | — | — | — | — | — | — |
+
+FAST loses to POWERFUL at very high confidence (p=0.0004, t=−3.5, sign p=0.0038, N=9984).
+STRONG loses to POWERFUL at very high confidence (p≈0.000, t=−4.55, sign p≈0.000, N=10240, Δ=−1.9 pts/game).
+The earlier STRONG run (p=0.20, "wash") was the bugged stats — fixing the orthogonal-pair accumulation
+reversed the verdict entirely.
+EXTREME is statistically indistinguishable from POWERFUL by t-test (p=0.47, Δ=+3.2 pts/game). The sign
+test favors POWERFUL (wins=2457 vs losses=2663, p=0.0042), but win frequency is the wrong metric here —
+the goal is points, not games. EXTREME scoring more total points while winning fewer pairs means it plays
+higher-variance: larger wins, smaller losses. That is the correct strategy in a points-accumulation game.
+The t-test on mean point diff is the authoritative measure; sign test is informational only.
+
+**Note:** p-values in the table above were computed with a bug in jass-server's statistical
+reporting. With orthogonal cards enabled, the server was accumulating individual game diffs
+instead of pair sums, so the t-test and sign test ran on N individual games (df=N−1) rather
+than N/2 orthogonal pairs (df=N/2−1). The effect is conservative: p-values are too large
+(significance is understated). Bug fixed; future results will be correct.
+
 ## Pre-AZ intermediate experiments (cheaper bridges to AZ)
 
 Three intermediate experiments that share infrastructure with full AZ, each with its own
