@@ -13,16 +13,18 @@ public class UnknownMessage implements Message {
     private static final Logger logger = LoggerFactory.getLogger(UnknownMessage.class);
 
     private final String unkownMessageType;
+    private final Object data;
 
-    public UnknownMessage(@JsonProperty(value = "type", required = false) String unkownMessageType) {
+    public UnknownMessage(
+            @JsonProperty(value = "type", required = false) String unkownMessageType,
+            @JsonProperty(value = "data") Object data) {
         this.unkownMessageType = unkownMessageType;
+        this.data = data;
     }
 
     @Override
     public Optional<Response> dispatch(GameHandler handler) {
-
-        logger.warn("Unknown message: {}", unkownMessageType);
-
+        logger.warn("Unknown message: {} data={}", unkownMessageType, data);
         return Optional.empty();
     }
 }

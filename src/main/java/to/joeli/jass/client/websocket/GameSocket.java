@@ -44,7 +44,7 @@ public class GameSocket {
     }
 
     void onClose(int statusCode, String reason) {
-        logger.trace("Connection closed: {} - {}", statusCode, reason);
+        logger.info("Connection closed: {} - {}", statusCode, reason);
     }
 
     public void onConnect(ResponseChannel responseChannel) {
