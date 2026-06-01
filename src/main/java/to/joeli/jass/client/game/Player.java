@@ -183,8 +183,7 @@ public class Player implements Comparable<Player> {
 		if (this.equals(move.getPlayer())) {
 			if (!cards.remove(move.getPlayedCard()))
 				logger.error("The player {} did not have card {}", move.getPlayer(), move.getPlayedCard());
-			else
-				cardBits &= ~(1L << move.getPlayedCard().ordinal());
+			cardBits &= ~(1L << move.getPlayedCard().ordinal());
 		}
 		jassStrategy.onMoveMade(move);
 	}
