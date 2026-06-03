@@ -328,6 +328,9 @@ public class Arena {
 			if (trainMode.isSavingData())
 				IOHelper.INSTANCE.saveData(cardsDataSet, scoreDataSet, episode, dataSetType, zeroPadded(i));
 		}
+		if (firstResult != null)
+			resultLogger.warn("numGames={} is odd with fair-tournament mode enabled — last game result dropped (no pair)", numGames);
+
 		gameSession.updateResult(); // normally called within gameSession.startNewGame(), so we need it at the end again
 		final Result result = gameSession.getResult();
 		logger.info("Aggregated result of the {} games played: {}\n", numGames, result);
