@@ -356,12 +356,14 @@ public class Arena {
 		double tP = Double.isNaN(t) ? Double.NaN : tTestTwoSidedP(t, df);
 
 		long wins = diffs.stream().filter(d -> d > 0).count();
-		long losses = n - wins; // ties impossible: total Jass points are always 157 (odd)
-		double signP = signTestTwoSidedP(wins, n);
+		long losses = diffs.stream().filter(d -> d < 0).count();
+		long nEff = wins + losses; // exclude ties (pair diffs can be 0 when pairA == 157)
+		double signP = nEff > 0 ? signTestTwoSidedP(wins, nEff) : Double.NaN;
 
 		resultLogger.info("--- Stats ({} pairs) ---", n);
 		resultLogger.info(String.format("Paired t-test: mean_diff=%.1f  sd=%.1f  t=%.3f  df=%d  p=%.4f", mean, Math.sqrt(variance), t, df, tP));
-		resultLogger.info(String.format("Sign test:     wins=%d  losses=%d  p=%.4f", wins, losses, signP));
+		long ties = n - nEff;
+		resultLogger.info(String.format("Sign test:     wins=%d  losses=%d  ties=%d  p=%.4f", wins, losses, ties, signP));
 	}
 
 	// Two-sided p-value for a paired t-test: P(|T| >= |t|) under H0
