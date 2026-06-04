@@ -51,6 +51,7 @@ public class Arena {
 	public static final Logger logger = LoggerFactory.getLogger(Arena.class);
 	public static final Logger experimentLogger = LoggerFactory.getLogger("Experiment");
 	public static final Logger resultLogger = LoggerFactory.getLogger("Result");
+	public static final Logger statsLogger = LoggerFactory.getLogger("Stats");
 
 	public static void main(String[] args) {
 		final Arena arena = new Arena(IMPROVEMENT_THRESHOLD_PERCENTAGE, SEED);
@@ -360,10 +361,10 @@ public class Arena {
 		long nEff = wins + losses; // exclude ties (pair diffs can be 0 when pairA == 157)
 		double signP = nEff > 0 ? signTestTwoSidedP(wins, nEff) : Double.NaN;
 
-		resultLogger.info("--- Stats ({} pairs) ---", n);
-		resultLogger.info(String.format("Paired t-test: mean_diff=%.1f  sd=%.1f  t=%.3f  df=%d  p=%.4f", mean, Math.sqrt(variance), t, df, tP));
 		long ties = n - nEff;
-		resultLogger.info(String.format("Sign test:     wins=%d  losses=%d  ties=%d  p=%.4f", wins, losses, ties, signP));
+		statsLogger.info("--- Stats ({} pairs) ---", n);
+		statsLogger.info(String.format("Paired t-test: mean_diff=%.1f  sd=%.1f  t=%.3f  df=%d  p=%.4f", mean, Math.sqrt(variance), t, df, tP));
+		statsLogger.info(String.format("Sign test:     wins=%d  losses=%d  ties=%d  p=%.4f", wins, losses, ties, signP));
 	}
 
 	// Two-sided p-value for a paired t-test: P(|T| >= |t|) under H0

@@ -37,7 +37,11 @@
         <appender-ref ref="RESULT" />
     </logger>
 
-<logger name="to.joeli" level="INFO" />
+<logger name="Stats" level="DEBUG" additivity="false">
+        <appender-ref ref="STDOUT" />
+    </logger>
+
+    <logger name="to.joeli" level="INFO" />
     <logger name="to.joeli.jass.client.strategy.training.Arena" level="INFO" />
 
     <root level="INFO">
