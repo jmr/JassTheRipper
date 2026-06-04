@@ -25,6 +25,27 @@ compileJava {
     targetCompatibility = javaVersion
 }
 
+task arenaStartScripts(type: CreateStartScripts) {
+    mainClass = 'to.joeli.jass.ApplicationArena'
+    applicationName = 'JassTheRipperArena'
+    outputDir = new File(project.buildDir, 'scripts/arena')
+    classpath = startScripts.classpath
+}
+
+installDist.dependsOn arenaStartScripts
+
+distributions {
+    main {
+        contents {
+            into('bin') {
+                from(arenaStartScripts)
+                fileMode = 0755
+                duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+            }
+        }
+    }
+}
+
 task(runExperiment, dependsOn: 'classes', type: JavaExec) {
     main = 'to.joeli.jass.client.strategy.training.Arena'
     classpath = sourceSets.main.runtimeClasspath
