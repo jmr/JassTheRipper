@@ -294,7 +294,6 @@ TODO Make new experiments with the improvements so far:
 	}
 
 	private void printCards(Set<Card> availableCards) {
-		System.out.println();
 		logger.info("Hi there! I am JassTheRipper and these are my cards: {} ", availableCards);
 	}
 

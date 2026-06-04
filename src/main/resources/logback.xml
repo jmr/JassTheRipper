@@ -6,6 +6,13 @@
         </encoder>
     </appender>
 
+    <appender name="STDERR" class="ch.qos.logback.core.ConsoleAppender">
+        <target>System.err</target>
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
     <property name="LOG_DIR" value="src/main/resources/" />
 
     <appender name="EXPERIMENT" class="ch.qos.logback.core.FileAppender">
@@ -34,6 +41,6 @@
     <logger name="to.joeli.jass.client.strategy.training.Arena" level="INFO" />
 
     <root level="INFO">
-        <appender-ref ref="STDOUT" />
+        <appender-ref ref="STDERR" />
     </root>
 </configuration>
