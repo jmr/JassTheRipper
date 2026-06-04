@@ -398,20 +398,27 @@ Server reports cumulative team scores and per-game sign/t stats.
 |---|---|---|---|---|---|---|
 | FAST vs POWERFUL | 9984 | 788 807 (≈79.0/game) | 821 107 (≈82.2/game) | −3.2 | 0.0004 | 0.0038 |
 | STRONG vs POWERFUL | 10240 | 817 349 (≈79.8/game) | 836 631 (≈81.7/game) | −1.9 | 0.0000 | 0.0000 |
-| EXTREME vs POWERFUL | 10240 | 828 530 (≈80.9/game) | 825 350 (≈80.6/game) | +3.2 | 0.4700 | 0.0042 |
-| INSANE vs POWERFUL | — | — | — | — | — | — |
-| SUPERMAN vs POWERFUL | — | — | — | — | — | — |
+| EXTREME vs POWERFUL | 10240 | 828 530 (≈80.9/game) | 825 350 (≈80.6/game) | +0.3 | 0.4700 | 0.0042 |
+| INSANE vs POWERFUL | 10240 | 835 638 (≈81.6/game) | 818 542 (≈79.9/game) | +1.7 | 0.0001 | 0.5113 |
+| SUPERMAN vs POWERFUL | 9324 | 762 417 (≈81.8/game) | 744 348 (≈79.8/game) | +1.9 | 0.0000 | 0.7808 |
 | IRONMAN vs POWERFUL | — | — | — | — | — | — |
 
 FAST loses to POWERFUL at very high confidence (p=0.0004, t=−3.5, sign p=0.0038, N=9984).
 STRONG loses to POWERFUL at very high confidence (p≈0.000, t=−4.55, sign p≈0.000, N=10240, Δ=−1.9 pts/game).
 The earlier STRONG run (p=0.20, "wash") was the bugged stats — fixing the orthogonal-pair accumulation
 reversed the verdict entirely.
-EXTREME is statistically indistinguishable from POWERFUL by t-test (p=0.47, Δ=+3.2 pts/game). The sign
+EXTREME is statistically indistinguishable from POWERFUL by t-test (p=0.47, Δ=+0.3 pts/game). The sign
 test favors POWERFUL (wins=2457 vs losses=2663, p=0.0042), but win frequency is the wrong metric here —
 the goal is points, not games. EXTREME scoring more total points while winning fewer pairs means it plays
 higher-variance: larger wins, smaller losses. That is the correct strategy in a points-accumulation game.
 The t-test on mean point diff is the authoritative measure; sign test is informational only.
+INSANE clearly beats POWERFUL by expected score (t=3.94, p=0.0001, Δ=+1.7 pts/game), confirming more
+compute still buys something above EXTREME. Sign test not significant (p=0.51) — same high-variance
+pattern: INSANE wins fewer pairs but by larger margins.
+SUPERMAN also clearly beats POWERFUL (t=4.46, p≈0.000, Δ=+1.9 pts/game, n=9324 games / 4662 pairs —
+match ended at MAX_POINTS threshold). Sign test not significant (p=0.78). Gap over INSANE is only
++0.2 pts/game despite 2.3× more compute (8×1000=8000 vs 7×500=3500 units), suggesting the curve is
+flattening above INSANE.
 
 **Note:** p-values in the table above were computed with a bug in jass-server's statistical
 reporting. With orthogonal cards enabled, the server was accumulating individual game diffs
