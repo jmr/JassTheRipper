@@ -8,15 +8,15 @@ import java.util.Optional;
 
 public class SessionJoined implements Message {
 
-    private final PlayerJoinedSession session;
+    private final SessionJoinedData data;
 
-    public SessionJoined(@JsonProperty(value = "data", required = true) PlayerJoinedSession session) {
-        this.session = session;
+    public SessionJoined(@JsonProperty(value = "data", required = true) SessionJoinedData data) {
+        this.data = data;
     }
 
     @Override
     public Optional<Response> dispatch(GameHandler handler) {
-        handler.onSessionJoined(session);
+        handler.onSessionJoined(data);
         return Optional.empty();
     }
 }

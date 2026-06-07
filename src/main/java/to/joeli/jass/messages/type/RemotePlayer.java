@@ -7,9 +7,9 @@ public class RemotePlayer {
     private final String name;
     private final int seatId;
 
-    public RemotePlayer(@JsonProperty(value = "id",required = true) String id,
-                        @JsonProperty(value = "name",required = true) String name,
-                        @JsonProperty(value = "seatId",required = true) int seatId) {
+    public RemotePlayer(@JsonProperty(value = "id", required = true) String id,
+                        @JsonProperty(value = "name", required = true) String name,
+                        @JsonProperty(value = "seatId", required = true) int seatId) {
         this.id = id;
         this.name = name;
         this.seatId = seatId;

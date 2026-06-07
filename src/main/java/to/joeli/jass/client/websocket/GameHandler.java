@@ -6,6 +6,7 @@ import to.joeli.jass.game.cards.Color;
 import to.joeli.jass.game.mode.Mode;
 import to.joeli.jass.messages.Mapping;
 import to.joeli.jass.messages.PlayerJoinedSession;
+import to.joeli.jass.messages.SessionJoinedData;
 import to.joeli.jass.messages.responses.ChooseCard;
 import to.joeli.jass.messages.responses.ChoosePlayerName;
 import to.joeli.jass.messages.responses.ChooseSession;
@@ -94,7 +95,7 @@ public class GameHandler {
 
 	// SESSION_JOINED is sent when an advisor joins a running session. BROADCAST_TEAMS is not re-sent,
 	// so we derive teams from seat IDs: seats 0+2 = team A, seats 1+3 = team B.
-	public void onSessionJoined(PlayerJoinedSession session) {
+	public void onSessionJoined(SessionJoinedData session) {
 		final List<RemotePlayer> players = session.getPlayersInSession();
 		final List<RemotePlayer> teamAPlayers = players.stream()
 				.filter(p -> p.getSeatId() % 2 == 0)
