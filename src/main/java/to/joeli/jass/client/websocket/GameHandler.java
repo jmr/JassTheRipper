@@ -14,6 +14,7 @@ import to.joeli.jass.messages.type.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -89,6 +90,23 @@ public class GameHandler {
 			localPlayer.setId(joinedPlayer.getPlayer().getId());
 			localPlayer.setSeatId(joinedPlayer.getPlayer().getSeatId());
 		}
+	}
+
+	// SESSION_JOINED is sent when an advisor joins a running session. BROADCAST_TEAMS is not re-sent,
+	// so we derive teams from seat IDs: seats 0+2 = team A, seats 1+3 = team B.
+	public void onSessionJoined(PlayerJoinedSession session) {
+		final List<RemotePlayer> players = session.getPlayersInSession();
+		final List<RemotePlayer> teamAPlayers = players.stream()
+				.filter(p -> p.getSeatId() % 2 == 0)
+				.collect(java.util.stream.Collectors.toList());
+		final List<RemotePlayer> teamBPlayers = players.stream()
+				.filter(p -> p.getSeatId() % 2 == 1)
+				.collect(java.util.stream.Collectors.toList());
+		final List<RemoteTeam> remoteTeams = Arrays.asList(
+				new RemoteTeam("Team 1", teamAPlayers),
+				new RemoteTeam("Team 2", teamBPlayers)
+		);
+		onBroadCastTeams(remoteTeams);
 	}
 
 	public void onBroadCastTeams(List<RemoteTeam> remoteTeams) {

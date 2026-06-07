@@ -25,6 +25,7 @@ import java.util.Optional;
         @JsonSubTypes.Type(value = RequestTrumpf.class, name = "REQUEST_TRUMPF"),
         @JsonSubTypes.Type(value = RejectCard.class, name = "REJECT_CARD"),
         @JsonSubTypes.Type(value = PlayerJoined.class, name = "BROADCAST_SESSION_JOINED"),
+        @JsonSubTypes.Type(value = SessionJoined.class, name = "SESSION_JOINED"),
         @JsonSubTypes.Type(value = DealCard.class, name = "DEAL_CARDS"),
         @JsonSubTypes.Type(value = RequestPlayerName.class, name = "REQUEST_PLAYER_NAME"),
         @JsonSubTypes.Type(value = PlayedCards.class, name = "PLAYED_CARDS"),

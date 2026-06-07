@@ -28,6 +28,10 @@ public class PlayerJoinedSession {
         return player;
     }
 
+    public List<RemotePlayer> getPlayersInSession() {
+        return playersInSession;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
