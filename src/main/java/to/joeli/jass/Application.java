@@ -149,6 +149,8 @@ public class Application {
 				} else {
 					flags.put(arg.substring(2), "true");
 				}
+			} else {
+				throw new IllegalArgumentException("Unrecognized argument: '" + arg + "' (expected --key or --key=value)");
 			}
 		}
 		return flags;
