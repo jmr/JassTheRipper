@@ -34,7 +34,7 @@ import java.util.concurrent.Future;
  * </pre>
  * Supported flags: --url, --name, --team, --session, --advised-player, --quit,
  *   --strength=&lt;level&gt; where level is any {@link to.joeli.jass.client.strategy.config.StrengthLevel}
- *   name (e.g. FAST, STRONG, POWERFUL, EXTREME). Default: POWERFUL (1000ms/move).
+ *   name (e.g. FAST, STRONG, POWERFUL, EXTREME). Default: POWERFUL (1000ms/move). Also applies in --human mode.
  *   --cards-estimator=&lt;episode&gt; load the cards neural network from the given episode (e.g. 0).
  *   --ucb=&lt;value&gt; UCB exploration constant (default: sqrt(2) ≈ 1.414).
  *   --puct enable PUCT selection with a heuristic prior (default: heavy).
@@ -56,8 +56,12 @@ public class Application {
 		String url = flags.getOrDefault("url", LOCAL_URL);
 
 		if (flags.containsKey("human")) {
-			logger.info("Human mode: starting 3 bots, leaving one slot for a human player.");
-			startHumanGame(url);
+			MCTSConfig humanMctsConfig = flags.containsKey("strength")
+					? new MCTSConfig(StrengthLevel.valueOf(flags.get("strength")))
+					: new MCTSConfig();
+			logger.info("Human mode: starting 3 bots at strength {}, leaving one slot for a human player.",
+					humanMctsConfig.getCardStrengthLevel());
+			startHumanGame(url, humanMctsConfig);
 			return;
 		}
 
@@ -110,14 +114,14 @@ public class Application {
 		}
 	}
 
-	private static void startHumanGame(String url) {
+	private static void startHumanGame(String url, MCTSConfig mctsConfig) {
 		ExecutorService executorService = Executors.newFixedThreadPool(3);
 		List<Future<?>> futures = new ArrayList<>();
 		int[] teamIndices = {0, 1, 1};
 		for (int teamIndex : teamIndices) {
 			final int ti = teamIndex;
 			futures.add(executorService.submit(() -> {
-				new RemoteGame(url, new Player(BOT_NAME, new JassTheRipperJassStrategy()), SessionType.SINGLE_GAME, "Java Client Session", ti, null, 720).start();
+				new RemoteGame(url, new Player(BOT_NAME, new JassTheRipperJassStrategy(new Config(mctsConfig))), SessionType.SINGLE_GAME, "Java Client Session", ti, null, 720).start();
 			}));
 			try {
 				Thread.sleep(500);
