@@ -84,6 +84,7 @@ public class GameHandler {
 
 	public void onDealCards(List<RemoteCard> dealCard) {
 		localPlayer.setCards(Mapping.mapAllToCards(dealCard));
+		logger.info("Advisor received {} cards for player id={}", localPlayer.getCards().size(), localPlayer.getId());
 	}
 
 	public void onPlayerJoined(PlayerJoinedSession joinedPlayer) {
@@ -96,6 +97,7 @@ public class GameHandler {
 	// SESSION_JOINED is sent when an advisor joins a running session. BROADCAST_TEAMS is not re-sent,
 	// so we derive teams from seat IDs: seats 0+2 = team A, seats 1+3 = team B.
 	public void onSessionJoined(SessionJoinedData session) {
+		logger.info("Advisor session joined: {}", session.getPlayersInSession());
 		final List<RemotePlayer> players = session.getPlayersInSession();
 		final List<RemotePlayer> teamAPlayers = players.stream()
 				.filter(p -> p.getSeatId() % 2 == 0)
@@ -159,6 +161,10 @@ public class GameHandler {
 	}
 
 	public ChooseCard onRequestCard() {
+		if (getCurrentRound() == null || localPlayer.getCards().isEmpty()) {
+			logger.warn("Advisor not yet ready (no current round or no cards) — skipping REQUEST_CARD");
+			return null;
+		}
 		checkEquals(getCurrentRound().getPlayingOrder().getCurrentPlayer(), localPlayer, "Order differed between remote and local state");
 
 		final Move move = localPlayer.makeMove(gameSession);
@@ -168,6 +174,10 @@ public class GameHandler {
 	}
 
 	public void onPlayedCards(List<RemoteCard> playedCards) {
+		if (getCurrentRound() == null) {
+			logger.warn("Advisor not yet ready — ignoring PLAYED_CARDS");
+			return;
+		}
 		final int playerPosition = playedCards.size() - 1;
 		final RemoteCard remoteCard = playedCards.get(playerPosition);
 
@@ -190,6 +200,10 @@ public class GameHandler {
 	}
 
 	public void onBroadCastStich(Stich stich) {
+		if (getCurrentRound() == null) {
+			logger.warn("Advisor not yet ready — ignoring BROADCAST_STICH");
+			return;
+		}
 		final Player winner = playerMapper.findPlayerById(stich.getId());
 		checkEquals(winner, getCurrentRound().getWinner(), "Local winner differs from remote");
 

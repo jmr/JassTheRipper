@@ -9,6 +9,7 @@ public class RequestCard implements Message {
 
     @Override
     public Optional<Response> dispatch(GameHandler handler) {
-        return Optional.of(handler.onRequestCard());
+        // ofNullable: onRequestCard returns null when the advisor hasn't received full game state yet
+        return Optional.ofNullable(handler.onRequestCard());
     }
 }
