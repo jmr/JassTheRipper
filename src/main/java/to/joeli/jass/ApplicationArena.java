@@ -7,6 +7,7 @@ import to.joeli.jass.client.strategy.config.RunsScaling;
 import to.joeli.jass.client.strategy.config.StrengthLevel;
 import to.joeli.jass.client.strategy.mcts.HeavyJassPlayoutSelectionPolicy;
 import to.joeli.jass.client.strategy.mcts.LightJassPlayoutSelectionPolicy;
+import to.joeli.jass.client.strategy.mcts.RoundConditionalPlayoutSelectionPolicy;
 import to.joeli.jass.client.strategy.training.Arena;
 
 import java.util.Map;
@@ -38,6 +39,8 @@ import java.util.Map;
  *   --puct-alpha2=&lt;val&gt;        PUCT prior weight for team 1 (default: 0.7)
  *   --puct-c1=&lt;val&gt;            PUCT exploration constant for team 0 (default: 100.0)
  *   --puct-c2=&lt;val&gt;            PUCT exploration constant for team 1 (default: 100.0)
+ *   --heavy-rounds1=&lt;n&gt;        Use heavy rollouts for tricks 0..n-1 (random after) for team 0
+ *   --heavy-rounds2=&lt;n&gt;        Use heavy rollouts for tricks 0..n-1 (random after) for team 1
  *   --seed=&lt;n&gt;                 Random seed (default: 42)
  * </pre>
  */
@@ -88,6 +91,11 @@ public class ApplicationArena {
 			mc.setPuctAlpha(Double.parseDouble(flags.get("puct-alpha" + suffix)));
 		if (flags.containsKey("puct-c" + suffix))
 			mc.setPuctC(Double.parseDouble(flags.get("puct-c" + suffix)));
+		if (flags.containsKey("heavy-rounds" + suffix)) {
+			int n = Integer.parseInt(flags.get("heavy-rounds" + suffix));
+			mc.setPlayoutSelectionPolicy(new RoundConditionalPlayoutSelectionPolicy(
+					new HeavyJassPlayoutSelectionPolicy(), n));
+		}
 		return mc;
 	}
 }
