@@ -14,6 +14,10 @@ class MCTSConfig {
     var cheating = false // enable this for comparing the cards estimator performance to a player who knows all the cards
     var hardPruningEnabled = false // enable this for hard pruning cards to focus more on promising areas of the tree
 
+    // At round 0, reject card-play determinizations whose forehand hand is inconsistent with the
+    // observed shift/no-shift action (mirrors the trumpf-phase shifted fix in CardKnowledgeBase).
+    var trumpConditionedDeterminization = false
+
     var seed = 42
     var scoreBoundsUsed = false
     var explorationConstant = sqrt(2.0)

@@ -41,6 +41,8 @@ import java.util.Map;
  *   --puct-c2=&lt;val&gt;            PUCT exploration constant for team 1 (default: 100.0)
  *   --heavy-rounds1=&lt;n&gt;        Use heavy rollouts for tricks 0..n-1 (random after) for team 0
  *   --heavy-rounds2=&lt;n&gt;        Use heavy rollouts for tricks 0..n-1 (random after) for team 1
+ *   --trump-cond1              Round-0 trump-conditioned determinization for team 0
+ *   --trump-cond2              Round-0 trump-conditioned determinization for team 1
  *   --seed=&lt;n&gt;                 Random seed (default: 42)
  * </pre>
  */
@@ -96,6 +98,8 @@ public class ApplicationArena {
 			mc.setPlayoutSelectionPolicy(new RoundConditionalPlayoutSelectionPolicy(
 					new HeavyJassPlayoutSelectionPolicy(), n));
 		}
+		if (flags.containsKey("trump-cond" + suffix))
+			mc.setTrumpConditionedDeterminization(true);
 		return mc;
 	}
 }

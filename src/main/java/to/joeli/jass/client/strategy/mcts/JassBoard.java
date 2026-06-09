@@ -38,6 +38,7 @@ public class JassBoard implements Board {
 	private Game game;
 	private boolean cheating; // Determines if the player knows the cards of the other players or not (used for experiments)
 	private boolean hardPruningEnabled; // Determines if the player knows the cards of the other players or not (used for experiments)
+	private boolean trumpConditionedDeterminization; // At round 0, reject samples inconsistent with the shift/no-shift action.
 	private int trumpfNumCandidates = TrumpfSelectionHelper.TOP_NUM_TRUMPFS;
 
 	// The neural network of the player choosing the move at the beginning. If null -> use random playout instead
@@ -49,13 +50,14 @@ public class JassBoard implements Board {
 
 	public static final Logger logger = LoggerFactory.getLogger(JassBoard.class);
 
-	private JassBoard(Set<Card> availableCards, GameSession gameSession, boolean shifted, Game game, boolean cheating, boolean hardPruningEnabled, ScoreEstimator scoreEstimator, CardsEstimator cardsEstimator) {
+	private JassBoard(Set<Card> availableCards, GameSession gameSession, boolean shifted, Game game, boolean cheating, boolean hardPruningEnabled, boolean trumpConditionedDeterminization, ScoreEstimator scoreEstimator, CardsEstimator cardsEstimator) {
 		this.availableCards = availableCards;
 		this.gameSession = gameSession;
 		this.shifted = shifted;
 		this.game = game;
 		this.cheating = cheating;
 		this.hardPruningEnabled = hardPruningEnabled;
+		this.trumpConditionedDeterminization = trumpConditionedDeterminization;
 		this.scoreEstimator = scoreEstimator;
 		this.cardsEstimator = cardsEstimator;
 	}
@@ -79,7 +81,7 @@ public class JassBoard implements Board {
 		// Subsequent duplicate(false) calls in treePolicy must NOT re-determinize, otherwise
 		// stored tree moves reference player+card combinations from a stale determinization.
 		// See: testDuplicateFalsePreservesTrumpfDeterminization
-		JassBoard jassBoard = new JassBoard(EnumSet.copyOf(availableCards), new GameSession(gameSession), shifted, null, cheating, hardPruningEnabled, scoreEstimator, cardsEstimator);
+		JassBoard jassBoard = new JassBoard(EnumSet.copyOf(availableCards), new GameSession(gameSession), shifted, null, cheating, hardPruningEnabled, false, scoreEstimator, cardsEstimator);
 		jassBoard.trumpfNumCandidates = trumpfNumCandidates;
 		return jassBoard;
 	}
@@ -94,7 +96,11 @@ public class JassBoard implements Board {
 	 * @return
 	 */
 	public static JassBoard constructCardSelectionJassBoard(Set<Card> availableCards, Game game, boolean cheating, boolean hardPruningEnabled, ScoreEstimator scoreEstimator, CardsEstimator cardsEstimator) {
-		return new JassBoard(EnumSet.copyOf(availableCards), null, game.isShifted(), new Game(game), cheating, hardPruningEnabled, scoreEstimator, cardsEstimator);
+		return constructCardSelectionJassBoard(availableCards, game, cheating, hardPruningEnabled, false, scoreEstimator, cardsEstimator);
+	}
+
+	public static JassBoard constructCardSelectionJassBoard(Set<Card> availableCards, Game game, boolean cheating, boolean hardPruningEnabled, boolean trumpConditionedDeterminization, ScoreEstimator scoreEstimator, CardsEstimator cardsEstimator) {
+		return new JassBoard(EnumSet.copyOf(availableCards), null, game.isShifted(), new Game(game), cheating, hardPruningEnabled, trumpConditionedDeterminization, scoreEstimator, cardsEstimator);
 	}
 
 	/**
@@ -123,7 +129,7 @@ public class JassBoard implements Board {
 	 */
 	void sampleCardDeterminizationToPlayersInCardPlay() {
 		if (!cheating) // if cheating: do nothing -> all the cards are known
-			CardKnowledgeBase.sampleCardDeterminizationToPlayers(this.game, this.availableCards, cardsEstimator);
+			CardKnowledgeBase.sampleCardDeterminizationToPlayers(this.game, this.availableCards, cardsEstimator, trumpConditionedDeterminization);
 		else
 			try {
 				Thread.sleep(1); // to make comparison fairer
@@ -159,7 +165,7 @@ public class JassBoard implements Board {
 			return jassBoard;
 		}
 
-		JassBoard jassBoard = constructCardSelectionJassBoard(availableCards, game, cheating, hardPruningEnabled, scoreEstimator, cardsEstimator);
+		JassBoard jassBoard = constructCardSelectionJassBoard(availableCards, game, cheating, hardPruningEnabled, trumpConditionedDeterminization, scoreEstimator, cardsEstimator);
 		if (newRandomCards)
 			jassBoard.sampleCardDeterminizationToPlayersInCardPlay();
 		return jassBoard;

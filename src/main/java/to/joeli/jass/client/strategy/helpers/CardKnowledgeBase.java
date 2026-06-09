@@ -119,6 +119,39 @@ public class CardKnowledgeBase {
 
 
 	/**
+	 * Samples a card determinization, optionally rejecting at round 0 if the sampled forehand hand
+	 * would not have produced the observed shift/no-shift action under the rule-based heuristic.
+	 * Mirrors the rejection in {@link #sampleCardDeterminizationToPlayers(GameSession, Set, boolean)}.
+	 */
+	public static void sampleCardDeterminizationToPlayers(Game game, Set<Card> availableCards,
+														 CardsEstimator cardsEstimator,
+														 boolean trumpConditioned) {
+		sampleCardDeterminizationToPlayers(game, availableCards, cardsEstimator);
+		if (!trumpConditioned) return;
+		for (int attempt = 1; attempt < MAX_REJECTION_ATTEMPTS; attempt++) {
+			if (isConsistentWithTrumpAction(game)) return;
+			sampleCardDeterminizationToPlayers(game, availableCards, cardsEstimator);
+		}
+		// Fall through: accept the last sample even if inconsistent (matches shifted-trumpf-phase behavior).
+	}
+
+	/**
+	 * Round-0 check: the forehand's reconstructed original 9-card hand is consistent with whether
+	 * they shifted or not. Outside round 0 (or in unexpected states) the predicate returns true so
+	 * the sampler accepts immediately.
+	 */
+	private static boolean isConsistentWithTrumpAction(Game game) {
+		Round round = game.getCurrentRound();
+		if (round.getRoundNumber() != 0) return true;
+		Player forehand = round.getPlayingOrder().getPlayersInInitialOrder().get(0);
+		Set<Card> forehandOriginalHand = EnumSet.copyOf(forehand.getCards());
+		Card playedByForehand = round.getCardOfPlayer(forehand);
+		if (playedByForehand != null) forehandOriginalHand.add(playedByForehand);
+		if (forehandOriginalHand.size() != 9) return true; // unexpected state — fail open
+		return TrumpfSelectionHelper.wouldShift(forehandOriginalHand) == game.isShifted();
+	}
+
+	/**
 	 * Samples a card determinization for a player with the given cards for the current player in a given game.
 	 * If a player did not follow suit in the game so far, the player will not be distributed any cards of this suit.
 	 * IMPORTANT: To be used during a game!
