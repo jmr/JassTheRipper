@@ -12,7 +12,12 @@ import to.joeli.jass.messages.responses.ChooseTrumpf;
 import to.joeli.jass.messages.type.*;
 import org.junit.Test;
 
+import to.joeli.jass.messages.SessionJoinedData;
+import to.joeli.jass.messages.SessionJoinedData.GameStateReplay;
+
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 
 import static com.shazam.shazamcrest.MatcherAssert.assertThat;
@@ -35,6 +40,7 @@ public class GameHandlerTest {
 
 		Player localPlayer = mock(Player.class);
 		when(localPlayer.makeMove(any(GameSession.class))).thenReturn(new Move(localPlayer, Card.DIAMOND_ACE));
+		when(localPlayer.getCards()).thenReturn(EnumSet.of(Card.DIAMOND_ACE));
 		when(localPlayer.getName()).thenReturn("local");
 		when(localPlayer.getId()).thenReturn("uid-1");
 
@@ -268,6 +274,50 @@ public class GameHandlerTest {
 		assertThat(gameHandler.getCurrentRound().getMoves().get(3).getPlayer().getName(), equalTo("remote 2"));
 	}
 
+
+	// Advisor mid-game join: Jesse (seat 2) schiebed, became trumpf chooser, led trick 0,
+	// played one card before the advisor connected. Verifies that startNewGameAt fast-forwards
+	// the PlayingOrder so the next PLAYED_CARDS lands on seat 3 (not seat 0).
+	@Test
+	public void onSessionJoined_withGameState_fastForwardsPlayingOrderToCorrectSeat() {
+		final String jesseName = "Jesse";
+		final String jesseId = "uid-jesse";
+		// localPlayer is the advisor; its id/seatId get replaced with Jesse's in replacePlayerWithAdvisor
+		final Player localPlayer = new Player(null, "Jesse-Advisor", -1);
+
+		final RemotePlayer remoteJR0    = new RemotePlayer("uid-0",  "JassTheRipper", 0);
+		final RemotePlayer remoteJR1    = new RemotePlayer("uid-1",  "JassTheRipper", 1);
+		final RemotePlayer remoteJesse  = new RemotePlayer(jesseId,  jesseName,       2);
+		final RemotePlayer remoteJR3    = new RemotePlayer("uid-3",  "JassTheRipper", 3);
+
+		// Jesse played HEART_JACK as the first card of trick 0 before advisor connected.
+		final RemoteCard jessePlayed  = new RemoteCard(11, HEARTS);
+		final RemoteCard seat3Card    = new RemoteCard(13, CLUBS);
+
+		final GameStateReplay gameState = new GameStateReplay(
+				2, 0, 2, singletonList(jessePlayed));
+		final SessionJoinedData session = new SessionJoinedData(
+				Arrays.asList(remoteJR0, remoteJR1, remoteJesse, remoteJR3), gameState);
+
+		final GameHandler handler = new GameHandler(localPlayer, SessionType.SINGLE_GAME,
+				"test-session", 0, jesseName);
+
+		handler.onSessionJoined(session);
+		handler.onBroadCastTrumpf(new TrumpfChoice(Trumpf.TRUMPF, HEARTS));
+
+		// After replay: trick 0 in progress, Jesse's card committed, currentPlayer = seat 3
+		assertThat("round number", handler.getCurrentRound().getRoundNumber(), equalTo(0));
+		assertThat("current player after replay",
+				handler.getCurrentRound().getPlayingOrder().getCurrentPlayer().getSeatId(), equalTo(3));
+
+		// Server broadcasts the second card of the trick (played by seat 3)
+		handler.onPlayedCards(Arrays.asList(jessePlayed, seat3Card));
+
+		// Both moves recorded; 2nd move attributed to seat 3, not seat 0
+		assertThat("moves in trick", handler.getCurrentRound().getMoves(), hasSize(2));
+		assertThat("2nd card attributed to seat 3",
+				handler.getCurrentRound().getMoves().get(1).getPlayer().getSeatId(), equalTo(3));
+	}
 
 	@Test
 	public void broadcastGschobe_does_not_start_game() {

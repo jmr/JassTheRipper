@@ -81,6 +81,44 @@ public class GameSession {
 		currentGame = Game.startGame(mode, initialOrder, teams, shifted);
 	}
 
+	/**
+	 * Advisor-only variant: fast-forwards game state to match a mid-hand join.
+	 * The advisor misses earlier messages, so the server sends the current trick state
+	 * in SESSION_JOINED. This method uses that state to initialize the game at the
+	 * correct round and playing-order position so the next PLAYED_CARDS lands on
+	 * the right seat.
+	 *
+	 * @param trickPlayedCards cards already on the table (replay via makeMove to advance PlayingOrder)
+	 */
+	public void startNewGameAt(Mode mode, boolean shifted, int gameStartingSeatId,
+	                            int currentRound, int trickLeaderSeatId,
+	                            List<Move> trickPlayedCards) {
+		updateResult();
+
+		// Rotate session-level order so it starts at the actual trumpf chooser.
+		final List<Player> players = gameStartingPlayingOrder.getPlayersInInitialOrder();
+		while (gameStartingPlayingOrder.getCurrentPlayer().getSeatId() != gameStartingSeatId) {
+			gameStartingPlayingOrder.moveToNextPlayer();
+		}
+		gameStartingPlayingOrder.moveToNextPlayer(); // rotate for the next game
+
+		// Find the trick leader and build a playing order starting there.
+		final Player trickLeader = players.stream()
+				.filter(p -> p.getSeatId() == trickLeaderSeatId)
+				.findFirst()
+				.orElseThrow(() -> new IllegalStateException("No player at trickLeaderSeatId=" + trickLeaderSeatId));
+		final PlayingOrder trickOrder = PlayingOrder.createOrderStartingFromPlayer(players, trickLeader);
+
+		currentGame = Game.startGameAtRound(mode, trickOrder, teams, shifted, currentRound);
+
+		// Replay the cards already played in the in-flight trick to advance PlayingOrder.
+		// We do NOT call localPlayer.onMoveMade here — the advisor's hand was already
+		// trimmed by the server before DEAL_CARDS was sent.
+		for (Move move : trickPlayedCards) {
+			currentGame.makeMove(move);
+		}
+	}
+
 	public Round startNextRound() {
 		return currentGame.startNextRound();
 	}

@@ -2,11 +2,13 @@ package to.joeli.jass.client.websocket;
 
 import to.joeli.jass.client.game.*;
 import to.joeli.jass.game.Trumpf;
+import to.joeli.jass.game.cards.Card;
 import to.joeli.jass.game.cards.Color;
 import to.joeli.jass.game.mode.Mode;
 import to.joeli.jass.messages.Mapping;
 import to.joeli.jass.messages.PlayerJoinedSession;
 import to.joeli.jass.messages.SessionJoinedData;
+import to.joeli.jass.messages.SessionJoinedData.GameStateReplay;
 import to.joeli.jass.messages.responses.ChooseCard;
 import to.joeli.jass.messages.responses.ChoosePlayerName;
 import to.joeli.jass.messages.responses.ChooseSession;
@@ -40,6 +42,7 @@ public class GameHandler {
 	private GameSession gameSession;
 	private PlayerMapper playerMapper;
 	private boolean shifted = false;
+	private GameStateReplay pendingReplay = null;
 
 	private static final Logger logger = LoggerFactory.getLogger(GameHandler.class);
 
@@ -96,8 +99,11 @@ public class GameHandler {
 
 	// SESSION_JOINED is sent when an advisor joins a running session. BROADCAST_TEAMS is not re-sent,
 	// so we derive teams from seat IDs: seats 0+2 = team A, seats 1+3 = team B.
+	// gameState (if present) is stashed and used in onBroadCastTrumpf to fast-forward to the
+	// correct round and trick position.
 	public void onSessionJoined(SessionJoinedData session) {
 		logger.info("Advisor session joined: {}", session.getPlayersInSession());
+		pendingReplay = session.getGameState();
 		final List<RemotePlayer> players = session.getPlayersInSession();
 		final List<RemotePlayer> teamAPlayers = players.stream()
 				.filter(p -> p.getSeatId() % 2 == 0)
@@ -125,13 +131,20 @@ public class GameHandler {
 	 * The decisions are still made by the player. The advisor is not added as a player in the server but only as an advisor.
 	 *
 	 * @param remoteTeams
+	 * TODO: see TODO.md — advisor identity model: overwriting localPlayer.id with the advised player's id
+	 * is fragile. localPlayer keeps name "X-Advisor" while id becomes the advised player's id, so
+	 * Player.equals (which compares both) would mis-match a separately-constructed Player for that seat.
+	 * This works today only because PlayerMapper returns the cached localPlayer object on id lookup.
 	 */
 	private void replacePlayerWithAdvisor(List<RemoteTeam> remoteTeams) {
 		if (advisedPlayerName != null) {
 			final Optional<RemotePlayer> advisedPlayerOptional = remoteTeams.stream()
 					.flatMap(remoteTeam -> remoteTeam.getPlayers().stream())
 					.filter(remotePlayer -> remotePlayer.getName().equals(advisedPlayerName)).findFirst();
-			advisedPlayerOptional.ifPresent(remotePlayer -> localPlayer.setId(remotePlayer.getId()));
+			advisedPlayerOptional.ifPresent(remotePlayer -> {
+				localPlayer.setId(remotePlayer.getId());
+				localPlayer.setSeatId(remotePlayer.getSeatId());
+			});
 		}
 	}
 
@@ -152,12 +165,43 @@ public class GameHandler {
 
 		if (trumpfChoice.getMode() != Trumpf.SCHIEBE) {
 			logger.info("Game started: {}", nextGameMode);
-			gameSession.startNewGame(nextGameMode, shifted);
+			if (pendingReplay != null) {
+				final List<Move> replayMoves = buildReplayMoves(pendingReplay);
+				gameSession.startNewGameAt(nextGameMode, shifted,
+						pendingReplay.getGameStartingSeatId(),
+						pendingReplay.getCurrentRound(),
+						pendingReplay.getTrickLeaderSeatId(),
+						replayMoves);
+				logger.info("Advisor fast-forwarded: gameStartingSeat={}, round={}, trickLeader={}, trickCards={}",
+						pendingReplay.getGameStartingSeatId(), pendingReplay.getCurrentRound(),
+						pendingReplay.getTrickLeaderSeatId(), pendingReplay.getTrickPlayedCards());
+				pendingReplay = null;
+			} else {
+				gameSession.startNewGame(nextGameMode, shifted);
+			}
 			localPlayer.onGameStarted(gameSession);
 			shifted = false;
 		} else {
 			shifted = true;
 		}
+	}
+
+	private List<Move> buildReplayMoves(GameStateReplay replay) {
+		final List<Player> players = gameSession.getPlayersInInitialPlayingOrder();
+		// Determine the playing order starting at trickLeaderSeatId so we can
+		// attribute each replayed card to the correct seat.
+		Player trickLeader = players.stream()
+				.filter(p -> p.getSeatId() == replay.getTrickLeaderSeatId())
+				.findFirst()
+				.orElseThrow(() -> new IllegalStateException("No player at trickLeaderSeatId=" + replay.getTrickLeaderSeatId()));
+		final PlayingOrder replayOrder = PlayingOrder.createOrderStartingFromPlayer(players, trickLeader);
+		final List<Move> moves = new java.util.ArrayList<>();
+		for (RemoteCard rc : replay.getTrickPlayedCards()) {
+			final Card card = Mapping.mapToCard(rc);
+			moves.add(new Move(replayOrder.getCurrentPlayer(), card));
+			replayOrder.moveToNextPlayer();
+		}
+		return moves;
 	}
 
 	public ChooseCard onRequestCard() {

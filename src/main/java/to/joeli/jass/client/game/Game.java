@@ -20,8 +20,12 @@ public class Game {
 	private List<Round> previousRounds = new ArrayList<>();
 
 	private Game(Mode mode, PlayingOrder order, List<Team> teams, boolean shifted) {
+		this(mode, order, teams, shifted, 0);
+	}
+
+	private Game(Mode mode, PlayingOrder order, List<Team> teams, boolean shifted, int roundNumber) {
 		this.mode = mode;
-		this.currentRound = Round.createRound(mode, 0, order);
+		this.currentRound = Round.createRound(mode, roundNumber, order);
 		this.result = new Result(teams.get(0), teams.get(1));
 		this.shifted = shifted;
 	}
@@ -45,6 +49,10 @@ public class Game {
 
 	public static Game startGame(Mode mode, PlayingOrder order, List<Team> teams, boolean shifted) {
 		return new Game(mode, order, teams, shifted);
+	}
+
+	public static Game startGameAtRound(Mode mode, PlayingOrder trickOrder, List<Team> teams, boolean shifted, int roundNumber) {
+		return new Game(mode, trickOrder, teams, shifted, roundNumber);
 	}
 
 	public Round getCurrentRound() {
