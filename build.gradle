@@ -39,7 +39,9 @@ distributions {
         contents {
             into('bin') {
                 from(arenaStartScripts)
-                fileMode = 0755
+                filePermissions {
+                    unix(0755)
+                }
                 duplicatesStrategy = DuplicatesStrategy.EXCLUDE
             }
         }
@@ -47,14 +49,14 @@ distributions {
 }
 
 task(runExperiment, dependsOn: 'classes', type: JavaExec) {
-    main = 'to.joeli.jass.client.strategy.training.Arena'
+    mainClass = 'to.joeli.jass.client.strategy.training.Arena'
     classpath = sourceSets.main.runtimeClasspath
     args 'CollectDataSet' // Retrieve with args[0]
     systemProperty 'simple.message', 'Hello ' // Retrieve with System.getProperty("simple.message")
 }
 
 task(startServer, dependsOn: 'classes', type: JavaExec) {
-    main = 'to.joeli.jass.client.rest.Server'
+    mainClass = 'to.joeli.jass.client.rest.Server'
     classpath = sourceSets.main.runtimeClasspath
 }
 
