@@ -61,4 +61,16 @@ public class RemoteGameSocket extends GameSocket {
         return objectMapper.readValue(msg, valueType);
     }
 
+    // Test hook: blocks until all messages submitted to messageProcessor so far
+    // have been processed. Needed because onWebSocketMessage now dispatches
+    // asynchronously, so tests calling it must wait before verifying handler
+    // interactions.
+    // TODO: a cleaner long-term fix is to have tests drive GameSocket.onMessage
+    // directly (synchronous) and cover JSON (de)serialization separately.
+    void awaitIdle() throws InterruptedException {
+        final CountDownLatch latch = new CountDownLatch(1);
+        messageProcessor.execute(latch::countDown);
+        latch.await();
+    }
+
 }
