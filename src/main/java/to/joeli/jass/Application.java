@@ -10,7 +10,9 @@ import to.joeli.jass.client.strategy.config.RunsScaling;
 import to.joeli.jass.client.strategy.config.StrengthLevel;
 import to.joeli.jass.client.strategy.mcts.HeavyJassPlayoutSelectionPolicy;
 import to.joeli.jass.client.strategy.mcts.LightJassPlayoutSelectionPolicy;
+import to.joeli.jass.client.strategy.mcts.PgxPlayoutSelectionPolicy;
 import to.joeli.jass.client.strategy.mcts.src.PlayoutSelectionPolicy;
+import to.joeli.jass.client.strategy.training.networks.PgxPolicyValueEstimator;
 import to.joeli.jass.messages.type.SessionType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,9 +38,12 @@ import java.util.concurrent.Future;
  *   --strength=&lt;level&gt; where level is any {@link to.joeli.jass.client.strategy.config.StrengthLevel}
  *   name (e.g. FAST, STRONG, POWERFUL, EXTREME). Default: POWERFUL (1000ms/move). Also applies in --human mode.
  *   --cards-estimator=&lt;episode&gt; load the cards neural network from the given episode (e.g. 0).
+ *   --pgx-model[=&lt;path&gt;] load the pgx PolicyValueNet SavedModel (default path: {@link PgxPolicyValueEstimator#DEFAULT_MODEL_PATH}).
+ *   --pgx-value enable the pgx value head as the MCTS leaf evaluator (requires --pgx-model).
+ *   --pgx-policy enable the pgx policy head as the PUCT prior (requires --pgx-model and --puct).
  *   --ucb=&lt;value&gt; UCB exploration constant (default: sqrt(2) ≈ 1.414).
  *   --puct enable PUCT selection with a heuristic prior (default: heavy).
- *   --puct-prior=light|heavy which playout-selection heuristic to use as the PUCT prior (default: heavy).
+ *   --puct-prior=light|heavy|pgx which playout-selection heuristic to use as the PUCT prior (default: heavy; pgx requires --pgx-model).
  *   --puct-alpha=&lt;value&gt; PUCT prior weight on heuristic-best move (default: 0.7).
  *   --puct-c=&lt;value&gt; PUCT exploration constant (default: 100.0).
  *   --timeout=&lt;minutes&gt; WebSocket close timeout in minutes (default: 720 = 12h).
@@ -81,12 +86,29 @@ public class Application {
 			mctsConfig.setRunsScaling(RunsScaling.valueOf(flags.get("runs-scaling")));
 		if (flags.containsKey("ucb"))
 			mctsConfig.setExplorationConstant(Double.parseDouble(flags.get("ucb")));
+		// Load pgx model early so it can be referenced by --puct-prior=pgx below
+		PgxPolicyValueEstimator pgxEstimator = null;
+		if (flags.containsKey("pgx-model")) {
+			String modelPath = flags.get("pgx-model");
+			pgxEstimator = new PgxPolicyValueEstimator();
+			pgxEstimator.loadModel(
+					(modelPath == null || modelPath.equals("true"))
+							? PgxPolicyValueEstimator.DEFAULT_MODEL_PATH
+							: modelPath);
+		}
+
 		if (flags.containsKey("puct")) {
 			mctsConfig.setPuctEnabled(true);
 			String prior = flags.getOrDefault("puct-prior", "heavy").toLowerCase();
-			PlayoutSelectionPolicy priorPolicy = prior.equals("light")
-					? new LightJassPlayoutSelectionPolicy()
-					: new HeavyJassPlayoutSelectionPolicy();
+			PlayoutSelectionPolicy priorPolicy;
+			if (prior.equals("pgx") && pgxEstimator != null) {
+				priorPolicy = new PgxPlayoutSelectionPolicy(pgxEstimator);
+				logger.info("Using pgx policy head as PUCT prior");
+			} else if (prior.equals("light")) {
+				priorPolicy = new LightJassPlayoutSelectionPolicy();
+			} else {
+				priorPolicy = new HeavyJassPlayoutSelectionPolicy();
+			}
 			mctsConfig.setPuctPriorPolicy(priorPolicy);
 		}
 		if (flags.containsKey("puct-alpha"))
@@ -97,6 +119,10 @@ public class Application {
 		Config config = new Config(mctsConfig);
 		if (flags.containsKey("cards-estimator"))
 			config.setCardsEstimatorUsed(true);
+		if (flags.containsKey("pgx-value"))
+			config.setPgxValueUsed(true);
+		if (flags.containsKey("pgx-policy"))
+			config.setPgxPolicyUsed(true);
 
 		JassTheRipperJassStrategy strategy = new JassTheRipperJassStrategy(config);
 
@@ -104,6 +130,13 @@ public class Application {
 			int episode = Integer.parseInt(flags.get("cards-estimator"));
 			strategy.getCardsEstimator().loadModel(episode);
 			logger.info("Loaded cards estimator from episode {}", episode);
+		}
+		if (pgxEstimator != null) {
+			strategy.setPgxEstimator(pgxEstimator);
+			if (flags.containsKey("pgx-value"))
+				logger.info("Enabled pgx value head as MCTS leaf evaluator");
+			if (flags.containsKey("pgx-policy"))
+				logger.info("Enabled pgx policy head for PUCT prior");
 		}
 
 		int closeTimeoutMin = Integer.parseInt(flags.getOrDefault("timeout", "720"));

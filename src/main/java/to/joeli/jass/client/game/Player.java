@@ -8,6 +8,7 @@ import to.joeli.jass.client.strategy.JassTheRipperJassStrategy;
 import to.joeli.jass.client.strategy.RandomJassStrategy;
 import to.joeli.jass.client.strategy.config.Config;
 import to.joeli.jass.client.strategy.training.networks.CardsEstimator;
+import to.joeli.jass.client.strategy.training.networks.PgxPolicyValueEstimator;
 import to.joeli.jass.client.strategy.training.networks.ScoreEstimator;
 import to.joeli.jass.game.cards.Card;
 import to.joeli.jass.game.cards.CardSet;
@@ -153,6 +154,16 @@ public class Player implements Comparable<Player> {
 	public void setCardsEstimator(CardsEstimator cardsEstimator) {
 		if (!(jassStrategy instanceof JassTheRipperJassStrategy)) throw new AssertionError();
 		((JassTheRipperJassStrategy) jassStrategy).setCardsEstimator(cardsEstimator);
+	}
+
+	public PgxPolicyValueEstimator getPgxEstimator() {
+		if (!(jassStrategy instanceof JassTheRipperJassStrategy)) throw new AssertionError();
+		return ((JassTheRipperJassStrategy) jassStrategy).getPgxEstimator();
+	}
+
+	public void setPgxEstimator(PgxPolicyValueEstimator pgxEstimator) {
+		if (!(jassStrategy instanceof JassTheRipperJassStrategy)) throw new AssertionError();
+		((JassTheRipperJassStrategy) jassStrategy).setPgxEstimator(pgxEstimator);
 	}
 
 	public Move makeMove(GameSession session) {

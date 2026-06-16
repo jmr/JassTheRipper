@@ -17,6 +17,7 @@ import to.joeli.jass.client.strategy.mcts.src.Move;
 import to.joeli.jass.client.strategy.mcts.src.PlayoutSelectionPolicy;
 import to.joeli.jass.client.strategy.training.Arena;
 import to.joeli.jass.client.strategy.training.networks.CardsEstimator;
+import to.joeli.jass.client.strategy.training.networks.PgxPolicyValueEstimator;
 import to.joeli.jass.client.strategy.training.networks.ScoreEstimator;
 import to.joeli.jass.game.cards.Card;
 import to.joeli.jass.game.mode.Mode;
@@ -45,12 +46,14 @@ public class JassBoard implements Board {
 	private final ScoreEstimator scoreEstimator;
 	// The neural network of the player estimating the hidden cards of the other players. If null -> only use heuristics
 	private final CardsEstimator cardsEstimator;
+	// The pgx PolicyValueNet (value head used for leaf scoring; null if disabled or not loaded)
+	private final PgxPolicyValueEstimator pgxEstimator;
 
 	private static final int HARD_PRUNING_LIMIT = 4;
 
 	public static final Logger logger = LoggerFactory.getLogger(JassBoard.class);
 
-	private JassBoard(Set<Card> availableCards, GameSession gameSession, boolean shifted, Game game, boolean cheating, boolean hardPruningEnabled, boolean trumpConditionedDeterminization, ScoreEstimator scoreEstimator, CardsEstimator cardsEstimator) {
+	private JassBoard(Set<Card> availableCards, GameSession gameSession, boolean shifted, Game game, boolean cheating, boolean hardPruningEnabled, boolean trumpConditionedDeterminization, ScoreEstimator scoreEstimator, CardsEstimator cardsEstimator, PgxPolicyValueEstimator pgxEstimator) {
 		this.availableCards = availableCards;
 		this.gameSession = gameSession;
 		this.shifted = shifted;
@@ -60,6 +63,7 @@ public class JassBoard implements Board {
 		this.trumpConditionedDeterminization = trumpConditionedDeterminization;
 		this.scoreEstimator = scoreEstimator;
 		this.cardsEstimator = cardsEstimator;
+		this.pgxEstimator = pgxEstimator;
 	}
 
 	/**
@@ -73,15 +77,19 @@ public class JassBoard implements Board {
 	 * @return
 	 */
 	public static JassBoard constructTrumpfSelectionJassBoard(Set<Card> availableCards, GameSession gameSession, boolean shifted, boolean cheating, boolean hardPruningEnabled, ScoreEstimator scoreEstimator, CardsEstimator cardsEstimator) {
-		return constructTrumpfSelectionJassBoard(availableCards, gameSession, shifted, cheating, hardPruningEnabled, scoreEstimator, cardsEstimator, TrumpfSelectionHelper.TOP_NUM_TRUMPFS);
+		return constructTrumpfSelectionJassBoard(availableCards, gameSession, shifted, cheating, hardPruningEnabled, scoreEstimator, cardsEstimator, TrumpfSelectionHelper.TOP_NUM_TRUMPFS, null);
 	}
 
 	public static JassBoard constructTrumpfSelectionJassBoard(Set<Card> availableCards, GameSession gameSession, boolean shifted, boolean cheating, boolean hardPruningEnabled, ScoreEstimator scoreEstimator, CardsEstimator cardsEstimator, int trumpfNumCandidates) {
+		return constructTrumpfSelectionJassBoard(availableCards, gameSession, shifted, cheating, hardPruningEnabled, scoreEstimator, cardsEstimator, trumpfNumCandidates, null);
+	}
+
+	public static JassBoard constructTrumpfSelectionJassBoard(Set<Card> availableCards, GameSession gameSession, boolean shifted, boolean cheating, boolean hardPruningEnabled, ScoreEstimator scoreEstimator, CardsEstimator cardsEstimator, int trumpfNumCandidates, PgxPolicyValueEstimator pgxEstimator) {
 		// NOTE: determinization is NOT done here. MCTSTask triggers it via duplicate(true).
 		// Subsequent duplicate(false) calls in treePolicy must NOT re-determinize, otherwise
 		// stored tree moves reference player+card combinations from a stale determinization.
 		// See: testDuplicateFalsePreservesTrumpfDeterminization
-		JassBoard jassBoard = new JassBoard(EnumSet.copyOf(availableCards), new GameSession(gameSession), shifted, null, cheating, hardPruningEnabled, false, scoreEstimator, cardsEstimator);
+		JassBoard jassBoard = new JassBoard(EnumSet.copyOf(availableCards), new GameSession(gameSession), shifted, null, cheating, hardPruningEnabled, false, scoreEstimator, cardsEstimator, pgxEstimator);
 		jassBoard.trumpfNumCandidates = trumpfNumCandidates;
 		return jassBoard;
 	}
@@ -96,11 +104,15 @@ public class JassBoard implements Board {
 	 * @return
 	 */
 	public static JassBoard constructCardSelectionJassBoard(Set<Card> availableCards, Game game, boolean cheating, boolean hardPruningEnabled, ScoreEstimator scoreEstimator, CardsEstimator cardsEstimator) {
-		return constructCardSelectionJassBoard(availableCards, game, cheating, hardPruningEnabled, false, scoreEstimator, cardsEstimator);
+		return constructCardSelectionJassBoard(availableCards, game, cheating, hardPruningEnabled, false, scoreEstimator, cardsEstimator, null);
 	}
 
 	public static JassBoard constructCardSelectionJassBoard(Set<Card> availableCards, Game game, boolean cheating, boolean hardPruningEnabled, boolean trumpConditionedDeterminization, ScoreEstimator scoreEstimator, CardsEstimator cardsEstimator) {
-		return new JassBoard(EnumSet.copyOf(availableCards), null, game.isShifted(), new Game(game), cheating, hardPruningEnabled, trumpConditionedDeterminization, scoreEstimator, cardsEstimator);
+		return constructCardSelectionJassBoard(availableCards, game, cheating, hardPruningEnabled, trumpConditionedDeterminization, scoreEstimator, cardsEstimator, null);
+	}
+
+	public static JassBoard constructCardSelectionJassBoard(Set<Card> availableCards, Game game, boolean cheating, boolean hardPruningEnabled, boolean trumpConditionedDeterminization, ScoreEstimator scoreEstimator, CardsEstimator cardsEstimator, PgxPolicyValueEstimator pgxEstimator) {
+		return new JassBoard(EnumSet.copyOf(availableCards), null, game.isShifted(), new Game(game), cheating, hardPruningEnabled, trumpConditionedDeterminization, scoreEstimator, cardsEstimator, pgxEstimator);
 	}
 
 	/**
@@ -159,13 +171,13 @@ public class JassBoard implements Board {
 	@Override
 	public Board duplicate(boolean newRandomCards) {
 		if (isChoosingTrumpf()) {
-			JassBoard jassBoard = constructTrumpfSelectionJassBoard(availableCards, gameSession, shifted, cheating, hardPruningEnabled, scoreEstimator, cardsEstimator, trumpfNumCandidates);
+			JassBoard jassBoard = constructTrumpfSelectionJassBoard(availableCards, gameSession, shifted, cheating, hardPruningEnabled, scoreEstimator, cardsEstimator, trumpfNumCandidates, pgxEstimator);
 			if (newRandomCards)
 				jassBoard.sampleCardDeterminizationToPlayersInTrumpfSelection();
 			return jassBoard;
 		}
 
-		JassBoard jassBoard = constructCardSelectionJassBoard(availableCards, game, cheating, hardPruningEnabled, trumpConditionedDeterminization, scoreEstimator, cardsEstimator);
+		JassBoard jassBoard = constructCardSelectionJassBoard(availableCards, game, cheating, hardPruningEnabled, trumpConditionedDeterminization, scoreEstimator, cardsEstimator, pgxEstimator);
 		if (newRandomCards)
 			jassBoard.sampleCardDeterminizationToPlayersInCardPlay();
 		return jassBoard;
@@ -370,19 +382,38 @@ public class JassBoard implements Board {
 		if (isChoosingTrumpf())
 			return false; // So far we only estimate the score during the card play
 
-		return scoreEstimator != null; // if there is a neural network set for the choosing player
+		// pgx value head takes priority when available; falls back to legacy ScoreEstimator
+		return pgxEstimator != null || scoreEstimator != null;
 	}
 
 	@Override
 	public double[] estimateScore() {
-		double score = scoreEstimator.predictScore(game);
-		// logger.info("The neural network predicted a score of " + score);
 		double[] scores = new double[getQuantityOfPlayers()];
-		for (Player player : game.getPlayers())
-			if (player.equals(game.getCurrentPlayer()) || player.equals(game.getPartnerOfPlayer(game.getCurrentPlayer())))
-				scores[player.getSeatId()] = score;
-			else
-				scores[player.getSeatId()] = Math.max(Arena.TOTAL_POINTS - score, 0); // Matchbonus disregarded for simplicity
+		Player currentPlayer = game.getCurrentPlayer();
+		Player partner = game.getPartnerOfPlayer(currentPlayer);
+
+		if (pgxEstimator != null) {
+			// pgx value head returns signed differential: my_team - opp_team in [-157, 157]
+			double diff = pgxEstimator.predictValue(game);
+			// Convert to per-player scores distributed in [0, TOTAL_POINTS]
+			double myTeamScore = Math.max(0, Math.min(Arena.TOTAL_POINTS, (Arena.TOTAL_POINTS + diff) / 2.0));
+			double oppTeamScore = Math.max(0, Arena.TOTAL_POINTS - myTeamScore);
+			for (Player player : game.getPlayers()) {
+				boolean isMyTeam = player.equals(currentPlayer) || player.equals(partner);
+				scores[player.getSeatId()] = isMyTeam ? myTeamScore : oppTeamScore;
+			}
+		} else {
+			// Legacy: ScoreEstimator returns my-team score in [0, 157]
+			double score = scoreEstimator.predictScore(game);
+			for (Player player : game.getPlayers())
+				if (player.equals(currentPlayer) || player.equals(partner))
+					scores[player.getSeatId()] = score;
+				else
+					scores[player.getSeatId()] = Math.max(Arena.TOTAL_POINTS - score, 0);
+		}
 		return scores;
 	}
+
+	/** Package-private: returns the current game, or {@code null} during trump selection. */
+	Game getGame() { return game; }
 }

@@ -12,6 +12,7 @@ import to.joeli.jass.client.strategy.mcts.src.Board
 import to.joeli.jass.client.strategy.mcts.src.MCTS
 import to.joeli.jass.client.strategy.mcts.src.Move
 import to.joeli.jass.client.strategy.training.networks.CardsEstimator
+import to.joeli.jass.client.strategy.training.networks.PgxPolicyValueEstimator
 import to.joeli.jass.client.strategy.training.networks.ScoreEstimator
 import to.joeli.jass.game.cards.Card
 
@@ -72,25 +73,34 @@ class MCTSHelper(private val mctsConfig: MCTSConfig) {
         val jassBoard: Board
         val scoreEstimator: ScoreEstimator?
         val cardsEstimator: CardsEstimator?
+        val pgxEstimator: PgxPolicyValueEstimator?
         val strengthLevel: StrengthLevel
         if (isChoosingTrumpf) {
             strengthLevel = mctsConfig.trumpfStrengthLevel
             scoreEstimator = gameSession.trumpfSelectingPlayer.scoreEstimator
             cardsEstimator = gameSession.trumpfSelectingPlayer.cardsEstimator
-            jassBoard = JassBoard.constructTrumpfSelectionJassBoard(availableCards, gameSession, shifted, mctsConfig.cheating, mctsConfig.hardPruningEnabled, scoreEstimator, cardsEstimator, mctsConfig.trumpfNumCandidates)
+            pgxEstimator = gameSession.trumpfSelectingPlayer.pgxEstimator
+            jassBoard = JassBoard.constructTrumpfSelectionJassBoard(availableCards, gameSession, shifted, mctsConfig.cheating, mctsConfig.hardPruningEnabled, scoreEstimator, cardsEstimator, mctsConfig.trumpfNumCandidates, pgxEstimator)
         } else {
             strengthLevel = mctsConfig.cardStrengthLevel
             scoreEstimator = gameSession.currentGame.currentPlayer.scoreEstimator
             cardsEstimator = gameSession.currentGame.currentPlayer.cardsEstimator
-            jassBoard = JassBoard.constructCardSelectionJassBoard(availableCards, gameSession.currentGame, mctsConfig.cheating, mctsConfig.hardPruningEnabled, mctsConfig.trumpConditionedDeterminization, scoreEstimator, cardsEstimator)
+            pgxEstimator = gameSession.currentGame.currentPlayer.pgxEstimator
+            jassBoard = JassBoard.constructCardSelectionJassBoard(availableCards, gameSession.currentGame, mctsConfig.cheating, mctsConfig.hardPruningEnabled, mctsConfig.trumpConditionedDeterminization, scoreEstimator, cardsEstimator, pgxEstimator)
         }
 
         var numDeterminizations = computeNumDeterminizations(gameSession, isChoosingTrumpf, strengthLevel.numDeterminizationsFactor)
 
         val roundNumber = if (isChoosingTrumpf) 0 else gameSession.currentRound!!.roundNumber
         var numRuns = mctsConfig.runsScaling.computeRuns(strengthLevel.numRuns, roundNumber)
+        val hasLeafEstimator = scoreEstimator != null || pgxEstimator != null
+        if (pgxEstimator != null) {
+            logger.info("Using pgx PolicyValueNet value head to determine the score")
+        }
         if (scoreEstimator != null) {
             logger.info("Using a score estimator network to determine the score")
+        }
+        if (hasLeafEstimator) {
             if (mctsConfig.runMode === RunMode.RUNS) {
                 numRuns /= 10 // NOTE: Less runs when using network because it should be superior to random playout
                 logger.info("Running only {} runs per determinization", numRuns)

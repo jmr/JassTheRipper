@@ -18,6 +18,7 @@ import to.joeli.jass.client.strategy.mcts.TrumpfMove;
 import to.joeli.jass.client.strategy.mcts.src.Move;
 import to.joeli.jass.client.strategy.mcts.src.PlayoutSelectionPolicy;
 import to.joeli.jass.client.strategy.training.networks.CardsEstimator;
+import to.joeli.jass.client.strategy.training.networks.PgxPolicyValueEstimator;
 import to.joeli.jass.client.strategy.training.networks.ScoreEstimator;
 import to.joeli.jass.game.cards.Card;
 import to.joeli.jass.game.mode.Mode;
@@ -117,6 +118,7 @@ TODO Make new experiments with the improvements so far:
 
 	private CardsEstimator cardsEstimator = new CardsEstimator(config.isCardsEstimatorTrainable());
 	private ScoreEstimator scoreEstimator = new ScoreEstimator(config.isScoreEstimatorTrainable());
+	private PgxPolicyValueEstimator pgxEstimator = null;
 
 
 	public static final Logger logger = LoggerFactory.getLogger(JassTheRipperJassStrategy.class);
@@ -325,6 +327,20 @@ TODO Make new experiments with the improvements so far:
 
 	public void setScoreEstimator(ScoreEstimator scoreEstimator) {
 		this.scoreEstimator = scoreEstimator;
+	}
+
+	/**
+	 * Returns the pgx estimator if it is loaded and at least one of the pgx heads is enabled.
+	 * Returns {@code null} otherwise (value/policy heads opt-in separately via Config).
+	 */
+	public PgxPolicyValueEstimator getPgxEstimator() {
+		if ((config.isPgxValueUsed() || config.isPgxPolicyUsed()) && pgxEstimator != null)
+			return pgxEstimator;
+		return null;
+	}
+
+	public void setPgxEstimator(PgxPolicyValueEstimator pgxEstimator) {
+		this.pgxEstimator = pgxEstimator;
 	}
 
 	public void shutDown() {

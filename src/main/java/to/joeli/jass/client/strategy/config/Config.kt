@@ -11,6 +11,11 @@ class Config {
     var isScoreEstimatorTrainable = false // This is used in Self Play Training
     var isCardsEstimatorTrainable = false // This is used in Self Play Training
 
+    /** Route the pgx PolicyValueNet value head into MCTS leaf scoring. */
+    var isPgxValueUsed = false
+    /** Route the pgx PolicyValueNet policy head into PUCT priors. */
+    var isPgxPolicyUsed = false
+
     // TODO MCTS still does not like to shift by itself. It is forced to shift now because of the rule-based pruning
     //  --> Investigate why MCTS without pruning does not like shifting
     // NOTE: In Situations where shifting is good, MCTS is inferior.
