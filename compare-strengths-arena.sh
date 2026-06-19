@@ -47,7 +47,7 @@ run_pgx_match() {
 PGX_GEN2=src/main/resources/models/pv_gen2_s128/export
 PGX_GEN3=src/main/resources/models/pv_gen3_s128/export
 
-run_pgx_match "pgx-gen2" "$PGX_GEN2" "pgx-gen3" "$PGX_GEN3"
+run_pgx_match "pgx-gen2" "$PGX_GEN2" "pgx-gen3" "$PGX_GEN3" "POWERFUL" 100
 
 # ── JTR strength curve (uncomment as needed) ─────────────────────────────────
 #run_match "Fast"    "FAST"    "FLAT" "Powerful" "POWERFUL" "FLAT" "RUNS"
