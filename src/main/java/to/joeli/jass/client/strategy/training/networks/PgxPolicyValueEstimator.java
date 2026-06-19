@@ -95,9 +95,15 @@ public class PgxPolicyValueEstimator {
      * The game must be fully determinized (all four {@code player.getCards()} populated).
      *
      * @param game a determinized game state
+     * <p>Not synchronized: the underlying {@code org.tensorflow} {@link SessionFunction}
+     * (and the {@link org.tensorflow.Session} it wraps) is thread-safe, so the MCTS
+     * determinization threads call the single shared session concurrently rather than
+     * serializing on a lock. One shared bundle avoids the thread-pool oversubscription
+     * that per-thread bundles caused (~3× slowdown).
+     *
      * @return raw forward-pass result (logits 0–42 and unscaled value)
      */
-    private synchronized ForwardResult forward(Game game) {
+    private ForwardResult forward(Game game) {
         if (!isLoaded()) {
             throw new IllegalStateException(
                     "PgxPolicyValueEstimator: model not loaded. Call loadModel() first.");
