@@ -7,5 +7,6 @@ build/
 out
 nohup.out
 /src/main/resources/episodes/
+/src/main/resources/models/
 /src/main/resources/*.csv
 /src/main/resources/*.txt

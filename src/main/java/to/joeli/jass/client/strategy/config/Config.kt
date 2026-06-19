@@ -15,6 +15,8 @@ class Config {
     var isPgxValueUsed = false
     /** Route the pgx PolicyValueNet policy head into PUCT priors. */
     var isPgxPolicyUsed = false
+    /** Path to the pgx TF2 SavedModel directory; null means pgx is disabled. */
+    var pgxModelPath: String? = null
 
     // TODO MCTS still does not like to shift by itself. It is forced to shift now because of the rule-based pruning
     //  --> Investigate why MCTS without pruning does not like shifting

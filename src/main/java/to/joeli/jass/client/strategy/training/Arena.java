@@ -9,6 +9,7 @@ import to.joeli.jass.client.strategy.training.data.CardsDataSet;
 import to.joeli.jass.client.strategy.training.data.DataSet;
 import to.joeli.jass.client.strategy.training.data.ScoreDataSet;
 import to.joeli.jass.client.strategy.training.networks.NeuralNetwork;
+import to.joeli.jass.client.strategy.training.networks.PgxPolicyValueEstimator;
 import to.joeli.jass.game.cards.Card;
 import to.joeli.jass.game.mode.Mode;
 
@@ -220,6 +221,16 @@ public class Arena {
 		resultLogger.info("Number of evaluation games: {}", numGames);
 		resultLogger.info("Number of double games: {}", numGames / 2);
 		gameSession.setConfigs(configs);
+		for (int i = 0; i < configs.length; i++) {
+			String pgxPath = configs[i].getPgxModelPath();
+			if (pgxPath != null && (configs[i].isPgxValueUsed() || configs[i].isPgxPolicyUsed())) {
+				PgxPolicyValueEstimator estimator = new PgxPolicyValueEstimator();
+				estimator.loadModel(pgxPath);
+				for (Player player : gameSession.getPlayersOfTeam(i)) {
+					player.setPgxEstimator(estimator);
+				}
+			}
+		}
 		return playGames(numGames, TrainMode.EVALUATION, null, -1);
 	}
 

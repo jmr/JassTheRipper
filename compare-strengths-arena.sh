@@ -26,13 +26,37 @@ run_match() {
     build/install/JassTheRipper/bin/JassTheRipperArena "${args[@]}"
 }
 
+# run_pgx_match name1 pgx_model1 name2 pgx_model2 [strength] [games]
+# Runs both teams with the pgx value head as MCTS leaf evaluator.
+run_pgx_match() {
+    local name1=$1 model1=$2 name2=$3 model2=$4 strength=${5:-POWERFUL} games=${6:-1000}
+    build/install/JassTheRipper/bin/JassTheRipperArena \
+        "--name1=$name1" "--strength1=$strength" "--scaling1=FLAT" \
+        "--name2=$name2" "--strength2=$strength" "--scaling2=FLAT" \
+        "--pgx-model1=$model1" "--pgx-model2=$model2" \
+        "--mode=RUNS" "--games=$games"
+}
+
 # Build once upfront.
 ./gradlew installDist
 
-# Strength curve: edit the matches below as needed.
+# ── pgx model arena matches ──────────────────────────────────────────────────
+# gen2 vs gen3: expected ~+14 pts/game in the pgx self-arena (gen3 stronger).
+# Here both use JTR's DMCTS with the pgx value head as leaf evaluator.
+# Models are gitignored; run ./scripts/import_pgx_models.sh to generate them.
+PGX_GEN2=src/main/resources/models/pv_gen2_s128/export
+PGX_GEN3=src/main/resources/models/pv_gen3_s128/export
+
+run_pgx_match "pgx-gen2" "$PGX_GEN2" "pgx-gen3" "$PGX_GEN3"
+
+# ── JTR strength curve (uncomment as needed) ─────────────────────────────────
 #run_match "Fast"    "FAST"    "FLAT" "Powerful" "POWERFUL" "FLAT" "RUNS"
 #run_match "Strong"  "STRONG"  "FLAT" "Powerful" "POWERFUL" "FLAT" "RUNS"
 #run_match "Extreme" "EXTREME" "FLAT" "Powerful" "POWERFUL" "FLAT" "RUNS"
 #run_match "Insane"  "INSANE"  "FLAT" "Powerful" "POWERFUL" "FLAT" "RUNS"
 #run_match "Superman" "SUPERMAN" "FLAT" "Powerful" "POWERFUL" "FLAT" "RUNS"
 #run_match "Ironman"  "IRONMAN"  "FLAT" "Powerful" "POWERFUL" "FLAT" "RUNS"
+
+# ── pgx vs JTR baselines (Step 4 of jass_plan.md; uncomment when ready) ─────
+#run_pgx_match "pgx-gen3" "$PGX_GEN3" "Powerful" "" "POWERFUL" 1000
+#run_pgx_match "pgx-gen3" "$PGX_GEN3" "Insane"   "" "INSANE"   1000

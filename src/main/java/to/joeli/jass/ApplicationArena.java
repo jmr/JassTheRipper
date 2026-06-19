@@ -43,6 +43,8 @@ import java.util.Map;
  *   --heavy-rounds2=&lt;n&gt;        Use heavy rollouts for tricks 0..n-1 (random after) for team 1
  *   --trump-cond1              Round-0 trump-conditioned determinization for team 0
  *   --trump-cond2              Round-0 trump-conditioned determinization for team 1
+ *   --pgx-model1=&lt;path&gt;        Load pgx SavedModel for team 0 and use value head as MCTS leaf
+ *   --pgx-model2=&lt;path&gt;        Load pgx SavedModel for team 1 and use value head as MCTS leaf
  *   --seed=&lt;n&gt;                 Random seed (default: 42)
  * </pre>
  */
@@ -58,21 +60,21 @@ public class ApplicationArena {
 			System.err.println("Warning: --games must be even for orthogonal pairing, rounded up to " + numGames);
 		}
 
-		MCTSConfig mc1 = buildMctsConfig(flags, "1");
-		MCTSConfig mc2 = buildMctsConfig(flags, "2");
-		String name1 = flags.getOrDefault("name1", mc1.getCardStrengthLevel().name());
-		String name2 = flags.getOrDefault("name2", mc2.getCardStrengthLevel().name());
+		Config config1 = buildConfig(flags, "1");
+		Config config2 = buildConfig(flags, "2");
+		String name1 = flags.getOrDefault("name1", config1.getMctsConfig().getCardStrengthLevel().name());
+		String name2 = flags.getOrDefault("name2", config2.getMctsConfig().getCardStrengthLevel().name());
 
 		System.out.printf("=== %s vs %s | %d games | seed=%d ===%n", name1, name2, numGames, seed);
 
-		Config[] configs = { new Config(mc1), new Config(mc2) };
+		Config[] configs = { config1, config2 };
 		Arena arena = new Arena(Arena.IMPROVEMENT_THRESHOLD_PERCENTAGE, seed, false);
 		double improvement = arena.runMatchWithConfigs(configs, numGames);
 
 		System.out.printf("=== %s scored %.2f%% of %s's points ===%n", name1, improvement, name2);
 	}
 
-	private static MCTSConfig buildMctsConfig(Map<String, String> flags, String suffix) {
+	private static Config buildConfig(Map<String, String> flags, String suffix) {
 		MCTSConfig mc = flags.containsKey("strength" + suffix)
 				? new MCTSConfig(StrengthLevel.valueOf(flags.get("strength" + suffix)))
 				: new MCTSConfig();
@@ -100,6 +102,12 @@ public class ApplicationArena {
 		}
 		if (flags.containsKey("trump-cond" + suffix))
 			mc.setTrumpConditionedDeterminization(true);
-		return mc;
+
+		Config config = new Config(mc);
+		if (flags.containsKey("pgx-model" + suffix)) {
+			config.setPgxModelPath(flags.get("pgx-model" + suffix));
+			config.setPgxValueUsed(true);
+		}
+		return config;
 	}
 }
