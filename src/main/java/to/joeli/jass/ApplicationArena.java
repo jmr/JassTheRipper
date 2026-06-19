@@ -26,7 +26,7 @@ import java.util.Map;
  *   --name1=&lt;name&gt;             Display name for team 0 (default: strength level name)
  *   --name2=&lt;name&gt;             Display name for team 1 (default: strength level name)
  *   --games=&lt;n&gt;                Number of games; must be even for orthogonal pairing (default: 10240)
- *   --mode=RUNS|TIME           RunMode (default: RUNS)
+ *   --mode=RUNS|TIME           RunMode (default: TIME, from MCTSConfig)
  *   --scaling1=&lt;scaling&gt;       RunsScaling for team 0 (default: FLAT)
  *   --scaling2=&lt;scaling&gt;       RunsScaling for team 1 (default: FLAT)
  *   --ucb1=&lt;val&gt;               UCB exploration constant for team 0
