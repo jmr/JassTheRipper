@@ -8,6 +8,7 @@ import to.joeli.jass.client.strategy.helpers.*;
 import to.joeli.jass.client.strategy.training.data.CardsDataSet;
 import to.joeli.jass.client.strategy.training.data.DataSet;
 import to.joeli.jass.client.strategy.training.data.ScoreDataSet;
+import to.joeli.jass.client.strategy.mcts.PgxPlayoutSelectionPolicy;
 import to.joeli.jass.client.strategy.training.networks.NeuralNetwork;
 import to.joeli.jass.client.strategy.training.networks.PgxPolicyValueEstimator;
 import to.joeli.jass.game.cards.Card;
@@ -220,14 +221,29 @@ public class Arena {
 		resultLogger.info("{}", configs[1]);
 		resultLogger.info("Number of evaluation games: {}", numGames);
 		resultLogger.info("Number of double games: {}", numGames / 2);
-		gameSession.setConfigs(configs);
+
+		// Load pgx estimators before setConfigs so that PgxPlayoutSelectionPolicy can be
+		// installed into MCTSConfig.puctPriorPolicy before MCTSHelper is constructed.
+		PgxPolicyValueEstimator[] estimators = new PgxPolicyValueEstimator[configs.length];
 		for (int i = 0; i < configs.length; i++) {
 			String pgxPath = configs[i].getPgxModelPath();
 			if (pgxPath != null && (configs[i].isPgxValueUsed() || configs[i].isPgxPolicyUsed())) {
-				PgxPolicyValueEstimator estimator = new PgxPolicyValueEstimator();
-				estimator.loadModel(pgxPath);
+				estimators[i] = new PgxPolicyValueEstimator();
+				estimators[i].loadModel(pgxPath);
+				if (configs[i].isPgxPolicyUsed()) {
+					configs[i].getMctsConfig().setPuctEnabled(true);
+					configs[i].getMctsConfig().setPuctPriorPolicy(
+							new PgxPlayoutSelectionPolicy(estimators[i]));
+				}
+			}
+		}
+
+		gameSession.setConfigs(configs);  // MCTSHelpers created here; see puctPriorPolicy above
+
+		for (int i = 0; i < configs.length; i++) {
+			if (estimators[i] != null) {
 				for (Player player : gameSession.getPlayersOfTeam(i)) {
-					player.setPgxEstimator(estimator);
+					player.setPgxEstimator(estimators[i]);
 				}
 			}
 		}

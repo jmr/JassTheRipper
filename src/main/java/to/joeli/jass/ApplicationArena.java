@@ -45,6 +45,8 @@ import java.util.Map;
  *   --trump-cond2              Round-0 trump-conditioned determinization for team 1
  *   --pgx-model1=&lt;path&gt;        Load pgx SavedModel for team 0 and use value head as MCTS leaf
  *   --pgx-model2=&lt;path&gt;        Load pgx SavedModel for team 1 and use value head as MCTS leaf
+ *   --pgx-policy1              Also use policy head as PUCT prior for team 0 (enables PUCT)
+ *   --pgx-policy2              Also use policy head as PUCT prior for team 1 (enables PUCT)
  *   --seed=&lt;n&gt;                 Random seed (default: 42)
  * </pre>
  */
@@ -108,6 +110,8 @@ public class ApplicationArena {
 			config.setPgxModelPath(flags.get("pgx-model" + suffix));
 			config.setPgxValueUsed(true);
 		}
+		if (flags.containsKey("pgx-policy" + suffix))
+			config.setPgxPolicyUsed(true);
 		return config;
 	}
 }
