@@ -13,6 +13,7 @@ import to.joeli.jass.game.cards.Color;
 import to.joeli.jass.game.mode.Mode;
 
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class CardSelectionHelper {
 
@@ -37,7 +38,7 @@ public class CardSelectionHelper {
 	}
 
 	public static Card chooseRandomCard(Set<Card> cards) {
-		return new ArrayList<>(cards).get(new Random().nextInt(cards.size()));
+		return new ArrayList<>(cards).get(ThreadLocalRandom.current().nextInt(cards.size()));
 	}
 
 	/**
