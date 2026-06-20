@@ -26,21 +26,23 @@ determinizations by **summed root visit counts** (not Q) when a policy prior is 
 **Result — gen2 vs gen3, both sides real PUCT, RUNS mode, swapped-deal paired t-test**
 (negative = gen3 ahead; mean_diff is per *pair* = 2 games, so per-game ≈ half):
 
-| runs/det | seed=42 | seed=43 | verdict |
-|:--|:--|:--|:--|
-| 20  | −6.7  p=0.19  (100 pairs) | — | trend |
-| **64**  | −14.6 p=0.003 (100 pairs) | **−6.4 p=0.020 (300 pairs)** | **gen3 ahead, replicated** |
-| 128 | +0.3  p=0.95  (100 pairs) | −3.5 p=0.32 (200 pairs) | weak / wash |
-| 256 | −9.0  p=0.034 (100 pairs) | — | gen3 ahead |
+| runs/det | seed=42 | seed=43 | seed=44 | verdict |
+|:--|:--|:--|:--|:--|
+| 20  | −6.7 p=0.19 (100p) | — | — | trend |
+| **64**  | −14.6 p=0.003 (100p) | −6.4 p=0.020 (300p) | **−9.5 p<0.0001 (500p)** | **gen3 ahead, confirmed** |
+| 128 | +0.3 p=0.95 (100p) | −3.5 p=0.32 (200p) | — | weak / wash |
+| 256 | −9.0 p=0.034 (100p) | — | — | gen3 ahead |
 
-(runs/det = `StrengthLevel.numRuns / 10` for network leaves; SWEEP_* levels added for this.)
+(runs/det = `StrengthLevel.numRuns / 10` for network leaves; SWEEP_* levels added for this.
+mean_diff is per pair = 2 games; negative = gen3 ahead.)
 
 **Takeaways:**
-- **It works:** gen3 > gen2 is significant and **replicated** at 64 runs/det (p=0.003, 0.020),
-  where the old argmax-tip/Q-sum setup washed. Real PUCT is the mechanism that surfaces the gain.
-- **Modest magnitude:** best estimate ~−6.4/pair (~3 pts/game) at 64/det — about half the noisy
-  100-pair figure, and well under pgx's own +14/game (JTR's determinized search dilutes the
-  policy gain).
+- **It works, confirmed:** gen3 > gen2 at 64 runs/det across three independent seeds, decisively
+  at 500 pairs (−9.5/pair, p<0.0001) — where the old argmax-tip/Q-sum setup washed (p=0.65).
+  Real PUCT is the mechanism that surfaces the gain.
+- **Modest magnitude:** settled best estimate ~−9.5/pair (**~4.75 pts/game**) at 64/det — well
+  under pgx's own +14/game (JTR's determinized search dilutes the policy gain), and gen3 still
+  loses to classical POWERFUL (see calibration below).
 - **No clean depth crossover:** 64/det is the sweet spot; 128 is oddly weak in both seeds; 256
   moderate. Not the tidy monotonic curve pgx's sims-sweep showed.
 - **Method note:** always use the Arena's built-in **paired** test (it pairs swapped deals). A
