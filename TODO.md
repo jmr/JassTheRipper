@@ -21,8 +21,24 @@ instead of silently falling back to index 0 when the start player is not found b
 ## Determinization RNG: finish the reproducibility refactor
 
 **Goal:** make MCTS runs bit-reproducible for a given seed, so arena results can be
-re-run exactly and run-to-run variance is minimized. (Two identical-seed 10-game arenas
-have produced different results, e.g. 104.69% vs 123.01%.)
+re-run exactly. (Two identical-seed 10-game arenas have produced different results,
+e.g. 104.69% vs 123.01%.)
+
+**Assessment (2026-06-20) — reproducibility-only, LOW PRIORITY.** This buys *nothing* but
+repeatability:
+- **No performance.** Determinization runs on the main thread (sequential, in the MCTSTask
+  constructor), so there is no cross-thread contention to remove. (The worker-thread contention
+  was already fixed by the tree-search SplittableRandom.)
+- **No correctness.** The current global-RNG sampling produces valid determinizations.
+- **No experiment-variance reduction.** The arena's swapped-deal pairing already cancels the
+  *deal* luck; two different agents each sample their own determinizations and can't/shouldn't
+  share draws, so seeding wouldn't tighten A-vs-B error bars.
+
+The only real uses are bug reproduction and mechanically verifying that a "behavior-preserving"
+search refactor truly is one (bit-identical games on the same seed). The refactor itself is
+large/risky (threads RNG through Distribution + the Board interface + CardKnowledgeBase's CSP +
+a hand-rolled Fisher-Yates). **Do it only on a concrete need** (an unreproducible heisenbug, or
+to validate a hairy search change) — not speculatively.
 
 **Already done** (commit "perf: per-determinization SplittableRandom for MCTS tree search"):
 the *tree-search* RNG is now a per-task `SplittableRandom` (split from a seeded root in the
