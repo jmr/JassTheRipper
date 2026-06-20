@@ -18,6 +18,14 @@ public class Node {
 	private boolean pruned;
 	private boolean valid = true;
 
+	// PUCT prior cache: the heuristic-best move for this node's position, computed once
+	// (lazily, on first PUCT child selection) and reused on every re-traversal. The prior
+	// depends only on this node's determinized position, which is fixed within its tree.
+	// Each determinization tree runs in a single thread (root parallelisation), so no
+	// synchronisation is needed.
+	private Move cachedPriorMove;
+	private boolean priorComputed;
+
 	/**
 	 * This creates the root node
 	 *
@@ -249,6 +257,22 @@ public class Node {
 
 	public void setOpti(double[] opti) {
 		this.opti = opti;
+	}
+
+	/** Whether the PUCT prior move for this node has already been computed and cached. */
+	public boolean isPriorComputed() {
+		return priorComputed;
+	}
+
+	/** The cached PUCT prior (heuristic-best) move; valid only once {@link #isPriorComputed()}. May be null. */
+	public Move getCachedPriorMove() {
+		return cachedPriorMove;
+	}
+
+	/** Caches the PUCT prior move for this node and marks it computed. */
+	public void setCachedPriorMove(Move cachedPriorMove) {
+		this.cachedPriorMove = cachedPriorMove;
+		this.priorComputed = true;
 	}
 
 	public boolean isPruned() {

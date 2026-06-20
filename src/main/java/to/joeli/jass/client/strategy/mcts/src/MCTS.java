@@ -492,7 +492,15 @@ public class MCTS {
 	private List<Node> findChildrenPuct(Node node, Board board, double optimisticBias, double pessimisticBias) {
 		List<Node> children = node.getChildren();
 		boolean useHeuristic = puctPriorPolicy != null && puctAlpha > 0.0;
-		Move heuristicBest = useHeuristic ? puctPriorPolicy.getBestMove(board) : null;
+		// The prior depends only on this node's (fixed) determinized position, so compute it
+		// once and reuse it on every re-traversal — avoids O(runs * depth) policy forward passes.
+		Move heuristicBest = null;
+		if (useHeuristic) {
+			if (!node.isPriorComputed()) {
+				node.setCachedPriorMove(puctPriorPolicy.getBestMove(board));
+			}
+			heuristicBest = node.getCachedPriorMove();
+		}
 		int nLegal = children.size();
 		double otherPrior = nLegal > 1 ? (1.0 - puctAlpha) / (nLegal - 1) : 1.0;
 		double uniformPrior = 1.0 / Math.max(1, nLegal);
