@@ -17,3 +17,45 @@ without the silent fallback to index 0.
 
 Prerequisite: tighten `PlayingOrder.createOrderStartingFromPlayer` (PlayingOrder.java) to throw
 instead of silently falling back to index 0 when the start player is not found by `equals`.
+
+## Determinization RNG: finish the reproducibility refactor
+
+**Goal:** make MCTS runs bit-reproducible for a given seed, so arena results can be
+re-run exactly and run-to-run variance is minimized. (Two identical-seed 10-game arenas
+have produced different results, e.g. 104.69% vs 123.01%.)
+
+**Already done** (commit "perf: per-determinization SplittableRandom for MCTS tree search"):
+the *tree-search* RNG is now a per-task `SplittableRandom` (split from a seeded root in the
+deterministic submit loop), so the 40 determinization threads no longer share a `Random`.
+That removed the cross-thread RNG contention that mattered. For the pgx arena specifically,
+this is the only worker-thread randomness (playouts are skipped under the value head and the
+pgx prior is deterministic), so the remaining gap is reproducibility, not correctness.
+
+**What's left — the determinization sampler still uses unseeded/global RNGs:**
+- `Distribution.sample()` — the randomness primitive for the **card-play** determinization
+  (`CardKnowledgeBase.sampleCardDeterminizationToPlayers(Game, Set, CardsEstimator)` at
+  line ~210). This is the main one used during games.
+- `Collections.shuffle(list)` in `CardKnowledgeBase.pickRandomSubSet` (trumpf-selection path).
+- `new Random()` in `CardSelectionHelper` (~line 40).
+
+**Why it's a sizeable change:** thread a `java.util.random.RandomGenerator` through
+- the generic `Board.duplicate(boolean)` interface (add an rng-accepting overload; only
+  `duplicate(true)` determinizes, called only from `MCTS.MCTSTask`'s constructor),
+- `JassBoard.duplicate` + `sampleCardDeterminizationToPlayersInCardPlay/InTrumpfSelection`,
+- `CardKnowledgeBase`'s 4 `sampleCardDeterminizationToPlayers` overloads + the CSP assignment
+  helper + `pickRandomSubSet`,
+- the `Distribution` class API (`sample(rng)`) and all its callers,
+- `CardSelectionHelper`.
+- Replace `Collections.shuffle(list)` with a hand-rolled Fisher-Yates driven by the
+  `RandomGenerator` (`Collections.shuffle` only accepts `java.util.Random`, which
+  `SplittableRandom` is not).
+
+**Simplifying fact:** determinization (`duplicate(true)`) runs only on the main thread
+(the `MCTSTask` constructor executes in the sequential submit loop), so the per-task rng
+from `rootRandom.split()` can be passed straight in — no concurrency concerns on this path.
+Keep the existing no-rng helper signatures (delegating to a fresh generator) so tests that
+call them don't need to change.
+
+**Verification:** after the refactor, two identical-seed arena runs must produce identical
+results. Run the full test suite (`Distribution`/`CardKnowledgeBase` are core) to guard
+against regressions.
