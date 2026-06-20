@@ -38,6 +38,8 @@ public class TrumpfSelectionHelper {
 		if (!isGschobe) {
 			allPossibleModes.add(Mode.shift());
 		}
+		// Unlike CardSelectionHelper.chooseRandomCard (hot in rollout playouts), trump selection
+		// happens at most once per game, so `new Random()` here is negligible — not worth ThreadLocalRandom.
 		return allPossibleModes.get(new Random().nextInt(allPossibleModes.size()));
 	}
 
