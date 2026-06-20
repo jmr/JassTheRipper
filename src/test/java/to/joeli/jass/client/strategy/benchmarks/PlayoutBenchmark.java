@@ -8,6 +8,7 @@ import to.joeli.jass.client.strategy.mcts.JassBoard;
 import to.joeli.jass.client.strategy.mcts.LightJassPlayoutSelectionPolicy;
 import to.joeli.jass.client.strategy.mcts.src.MCTS;
 
+import java.util.SplittableRandom;
 import java.util.concurrent.TimeUnit;
 
 
@@ -23,6 +24,7 @@ public class PlayoutBenchmark {
 
 	private JassBoard jassBoard;
 	private final MCTS mcts = new MCTS();
+	private final SplittableRandom rng = new SplittableRandom(42);
 	private final HeavyJassPlayoutSelectionPolicy heavyJassPlayoutSelectionPolicy = new HeavyJassPlayoutSelectionPolicy();
 	private final LightJassPlayoutSelectionPolicy lightJassPlayoutSelectionPolicy = new LightJassPlayoutSelectionPolicy();
 
@@ -35,7 +37,7 @@ public class PlayoutBenchmark {
 	@Benchmark
 	@Fork(1)
 	public void benchmarkSimulationSpeedRandomPlayout() {
-		mcts.getRandomMove(jassBoard);
+		mcts.getRandomMove(jassBoard, rng);
 	}
 
 	@Benchmark

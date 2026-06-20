@@ -6,6 +6,7 @@ import to.joeli.jass.client.strategy.exceptions.MCTSException;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.random.RandomGenerator;
 
 // TODO evaluate which is more important: many runs or many root parallelisations
 
@@ -17,7 +18,10 @@ import java.util.concurrent.*;
  */
 public class MCTS {
 
-	private Random random = new Random(42);
+	// Root RNG seed source. Each determinization task gets its own generator via
+	// rootRandom.split() (done in the deterministic submit loop on the calling thread),
+	// so worker threads never share an RNG: no contention and runs are reproducible.
+	private SplittableRandom rootRandom = new SplittableRandom(42);
 	private boolean rootParallelisationEnabled;
 	private boolean scoreBoundsUsed;
 	private double explorationConstant = Math.sqrt(2.0);
@@ -76,7 +80,7 @@ public class MCTS {
 		try {
 			if (!rootParallelisationEnabled) {
 				logger.info("Only running one determinization");
-				return executeByTime(startingBoard, endingTime).getMove();
+				return executeByTime(startingBoard, endingTime, rootRandom.split()).getMove();
 			} else {
 				this.numDeterminizations = numDeterminizations;
 				logger.info("Running {} determinizations", numDeterminizations);
@@ -90,7 +94,7 @@ public class MCTS {
 
 	private void submitTimeTasks(Board startingBoard, long endingTime) {
 		for (int i = 0; i < numDeterminizations; i++)
-			futures.add((FutureTask<Node>) threadPool.submit(new MCTSTaskTime(startingBoard, endingTime)));
+			futures.add((FutureTask<Node>) threadPool.submit(new MCTSTaskTime(startingBoard, endingTime, rootRandom.split())));
 	}
 
 
@@ -106,7 +110,7 @@ public class MCTS {
 		try {
 			if (!rootParallelisationEnabled) {
 				logger.info("Only running one determinization :(");
-				return executeByRuns(startingBoard, runs).getMove();
+				return executeByRuns(startingBoard, runs, rootRandom.split()).getMove();
 			} else {
 				this.numDeterminizations = numDeterminizations;
 				logger.info("Running {} determinizations :)", numDeterminizations);
@@ -121,7 +125,7 @@ public class MCTS {
 
 	private void submitRunsTasks(Board startingBoard, long runs) {
 		for (int i = 0; i < numDeterminizations; i++)
-			futures.add((FutureTask<Node>) threadPool.submit(new MCTSTaskRuns(startingBoard, runs)));
+			futures.add((FutureTask<Node>) threadPool.submit(new MCTSTaskRuns(startingBoard, runs, rootRandom.split())));
 	}
 
 
@@ -132,14 +136,14 @@ public class MCTS {
 	 * @param runs
 	 * @return the final move selected
 	 */
-	private Node executeByRuns(Board startingBoard, long runs) {
+	private Node executeByRuns(Board startingBoard, long runs, RandomGenerator rng) {
 		Node rootNode = new Node(startingBoard);
 		long startTime = System.currentTimeMillis();
 		for (int i = 0; i < runs; i++)
-			select(startingBoard, rootNode);
+			select(startingBoard, rootNode, rng);
 		logger.debug("Ran {} runs in {}ms.", runs, System.currentTimeMillis() - startTime);
 		recordRootVisits(rootNode);
-		return finalSelection(rootNode);
+		return finalSelection(rootNode, rng);
 	}
 
 	/**
@@ -149,13 +153,13 @@ public class MCTS {
 	 * @param endingTime
 	 * @return the final move selected
 	 */
-	private Node executeByTime(Board startingBoard, long endingTime) {
+	private Node executeByTime(Board startingBoard, long endingTime, RandomGenerator rng) {
 		Node rootNode = new Node(startingBoard);
 		long startTime = System.currentTimeMillis();
 		long runCounter = 0;
 		while ((System.currentTimeMillis() < endingTime)) {
 			// Start new path from root node
-			select(startingBoard, rootNode);
+			select(startingBoard, rootNode, rng);
 			runCounter++;
 		}
 		if (runCounter == 0) {
@@ -166,7 +170,7 @@ public class MCTS {
 		}
 		logger.debug("Ran {} runs in {}ms.", runCounter, System.currentTimeMillis() - startTime);
 		recordRootVisits(rootNode);
-		return finalSelection(rootNode);
+		return finalSelection(rootNode, rng);
 	}
 
 	private void recordRootVisits(Node rootNode) {
@@ -275,11 +279,11 @@ public class MCTS {
 	 * @param currentNode  Node from which to start selection
 	 * @param currentBoard Board state to work from.
 	 */
-	private void select(Board currentBoard, Node currentNode) {
-		BoardNodePair boardNodePair = treePolicy(currentBoard, currentNode);
+	private void select(Board currentBoard, Node currentNode, RandomGenerator rng) {
+		BoardNodePair boardNodePair = treePolicy(currentBoard, currentNode, rng);
 
 		// Run a random playout until the end of the game.
-		double[] score = playout(boardNodePair.getBoard());
+		double[] score = playout(boardNodePair.getBoard(), rng);
 
 		// Backpropagate results of playout.
 		Node node = boardNodePair.getNode();
@@ -294,7 +298,7 @@ public class MCTS {
 	 * Return the new node or the deepest node it could reach.
 	 * Additionally, return a board matching the returned node.
 	 */
-	private BoardNodePair treePolicy(Board oldBoard, Node node) {
+	private BoardNodePair treePolicy(Board oldBoard, Node node, RandomGenerator rng) {
 		Board board = oldBoard.duplicate(false);
 		int depth = 0;
 
@@ -305,7 +309,7 @@ public class MCTS {
 				}
 
 				if (!node.getUnvisitedChildren().isEmpty()) {
-					Node temp = node.getUnvisitedChildren().remove(random.nextInt(node.getUnvisitedChildren().size()));
+					Node temp = node.getUnvisitedChildren().remove(rng.nextInt(node.getUnvisitedChildren().size()));
 					node.getChildren().add(temp);
 					board.makeMove(temp.getMove());
 					depth++;
@@ -323,7 +327,7 @@ public class MCTS {
 						return new BoardNodePair(board, node);
 					}
 
-					Node finalNode = bestNodes.get(random.nextInt(bestNodes.size()));
+					Node finalNode = bestNodes.get(rng.nextInt(bestNodes.size()));
 					node = finalNode;
 					board.makeMove(finalNode.getMove());
 					depth++;
@@ -349,7 +353,7 @@ public class MCTS {
 				// The tree policy for random nodes is different. We
 				// ignore selection heuristics and pick one node at
 				// random based on the weight vector.
-				Node selectedNode = node.getChildren().get(getRandomChildNodeIndex(board));
+				Node selectedNode = node.getChildren().get(getRandomChildNodeIndex(board, rng));
 				node = selectedNode;
 				board.makeMove(selectedNode.getMove());
 				depth++;
@@ -367,7 +371,7 @@ public class MCTS {
 	 * @param board
 	 * @return
 	 */
-	private double[] playout(Board board) {
+	private double[] playout(Board board, RandomGenerator rng) {
 		// Do not simulate the playout but estimate the score directly with a neural network
 		if (board.hasScoreEstimator())
 			return board.estimateScore();
@@ -375,7 +379,7 @@ public class MCTS {
 		// INFO: Run multiple playouts and take average to get a more reliable outcome. If numPlayouts = 1 take the outcome directly
 		double[] scoreAggregate = new double[board.getQuantityOfPlayers()];
 		for (int i = 0; i < numPlayouts; i++) {
-			final double[] score = runPlayout(board.duplicate(false));
+			final double[] score = runPlayout(board.duplicate(false), rng);
 			for (int j = 0; j < score.length; j++) {
 				scoreAggregate[j] += score[j];
 			}
@@ -393,12 +397,12 @@ public class MCTS {
 	 * @param board
 	 * @return
 	 */
-	private double[] runPlayout(Board board) {
+	private double[] runPlayout(Board board, RandomGenerator rng) {
 		// Start playing random moves until the game is over
 		while (!board.gameOver()) {
 			Move move;
 			if (playoutSelectionPolicy == null) {
-				move = getRandomMove(board);
+				move = getRandomMove(board, rng);
 			} else {
 				move = playoutSelectionPolicy.getBestMove(board); // NOTE: Originally it used the not duplicated oldBoard here.
 			}
@@ -407,18 +411,18 @@ public class MCTS {
 		return board.getScore();
 	}
 
-	public Move getRandomMove(Board board) {
+	public Move getRandomMove(Board board, RandomGenerator rng) {
 		List<Move> moves = board.getMoves(CallLocation.PLAYOUT); // NOTE: Originally it used CallLocation.TREE_POLICY here
 		if (moves.isEmpty()) throw new AssertionError();
 		if (board.getCurrentPlayer() >= 0) {
 			// make random selection normally
-			return moves.get(random.nextInt(moves.size()));
+			return moves.get(rng.nextInt(moves.size()));
 		} else {
 			// This situation only occurs when a move
 			// is entirely random, for example a die
 			// roll. We must consider the random weights
 			// of the moves.
-			return moves.get(getRandomChildNodeIndex(board));
+			return moves.get(getRandomChildNodeIndex(board, rng));
 		}
 	}
 
@@ -428,7 +432,7 @@ public class MCTS {
 	 * @param board
 	 * @return
 	 */
-	private static int getRandomChildNodeIndex(Board board) {
+	private static int getRandomChildNodeIndex(Board board, RandomGenerator rng) {
 		double[] weights = board.getMoveWeights();
 
 		double totalWeight = 0.0d;
@@ -437,7 +441,7 @@ public class MCTS {
 		}
 
 		int randomIndex = -1;
-		double random = Math.random() * totalWeight;
+		double random = rng.nextDouble() * totalWeight;
 		for (int i = 0; i < weights.length; ++i) {
 			random -= weights[i];
 			if (random <= 0.0d) {
@@ -536,17 +540,17 @@ public class MCTS {
 	 * @param node this is the node whose children are considered
 	 * @return the node with the best Move the algorithm can find or null if the node is invalid
 	 */
-	private Node finalSelection(Node node) {
+	private Node finalSelection(Node node, RandomGenerator rng) {
 		if (!node.isValid()) // if there was no run completed
 			return null;
 
 		switch (finalSelectionPolicy) {
 			case MAX_CHILD:
-				return maxChild(node);
+				return maxChild(node, rng);
 			case ROBUST_CHILD:
-				return robustChild(node);
+				return robustChild(node, rng);
 			default:
-				return robustChild(node);
+				return robustChild(node, rng);
 		}
 	}
 
@@ -556,7 +560,7 @@ public class MCTS {
 	 * @param node
 	 * @return
 	 */
-	private Node robustChild(Node node) {
+	private Node robustChild(Node node, RandomGenerator rng) {
 		double bestValue = Double.NEGATIVE_INFINITY;
 		double tempBest;
 		ArrayList<Node> bestNodes = new ArrayList<>();
@@ -566,7 +570,7 @@ public class MCTS {
 			bestValue = getBestValue(bestValue, tempBest, bestNodes, current);
 		}
 
-		return bestNodes.get(random.nextInt(bestNodes.size()));
+		return bestNodes.get(rng.nextInt(bestNodes.size()));
 	}
 
 	/**
@@ -575,7 +579,7 @@ public class MCTS {
 	 * @param node
 	 * @return
 	 */
-	private Node maxChild(Node node) {
+	private Node maxChild(Node node, RandomGenerator rng) {
 		double bestValue = Double.NEGATIVE_INFINITY;
 		double tempBest;
 		ArrayList<Node> bestNodes = new ArrayList<>();
@@ -587,7 +591,7 @@ public class MCTS {
 			bestValue = getBestValue(bestValue, tempBest, bestNodes, s);
 		}
 
-		return bestNodes.get(random.nextInt(bestNodes.size()));
+		return bestNodes.get(rng.nextInt(bestNodes.size()));
 	}
 
 
@@ -723,16 +727,19 @@ public class MCTS {
 	}
 
 	public void setRandom(int seed) {
-		this.random = new Random(seed);
+		this.rootRandom = new SplittableRandom(seed);
 	}
 
 	protected abstract class MCTSTask implements Callable<Node> {
 		protected Board board;
+		// Per-task generator (split from rootRandom in the submit loop); used only by this task's thread.
+		protected final RandomGenerator rng;
 
-		protected MCTSTask(Board board) {
+		protected MCTSTask(Board board, RandomGenerator rng) {
 			// Here we create a new determinization by distributing new random cards for the hidden cards of the other players
 			// Starting from here we operate in a perfect information game setting!
 			this.board = board.duplicate(true);
+			this.rng = rng;
 		}
 	}
 
@@ -742,14 +749,14 @@ public class MCTS {
 	protected class MCTSTaskTime extends MCTSTask {
 		protected long endingTime;
 
-		protected MCTSTaskTime(Board board, long endingTime) {
-			super(board);
+		protected MCTSTaskTime(Board board, long endingTime, RandomGenerator rng) {
+			super(board, rng);
 			this.endingTime = endingTime;
 		}
 
 		@Override
 		public Node call() {
-			return executeByTime(board, endingTime);
+			return executeByTime(board, endingTime, rng);
 		}
 	}
 
@@ -760,14 +767,14 @@ public class MCTS {
 	protected class MCTSTaskRuns extends MCTSTask {
 		protected long runs;
 
-		protected MCTSTaskRuns(Board board, long runs) {
-			super(board);
+		protected MCTSTaskRuns(Board board, long runs, RandomGenerator rng) {
+			super(board, rng);
 			this.runs = runs;
 		}
 
 		@Override
 		public Node call() {
-			return executeByRuns(board, runs);
+			return executeByRuns(board, runs, rng);
 		}
 	}
 
