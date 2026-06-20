@@ -80,7 +80,10 @@ public class MCTS {
 		try {
 			if (!rootParallelisationEnabled) {
 				logger.info("Only running one determinization");
-				return executeByTime(startingBoard, endingTime, rootRandom.split()).getMove();
+				Node result = executeByTime(startingBoard, endingTime, rootRandom.split());
+				return useVisitCountAggregation()
+						? voteByVisitCounts(Collections.singletonList(result))
+						: result.getMove();
 			} else {
 				this.numDeterminizations = numDeterminizations;
 				logger.info("Running {} determinizations", numDeterminizations);
@@ -110,7 +113,10 @@ public class MCTS {
 		try {
 			if (!rootParallelisationEnabled) {
 				logger.info("Only running one determinization :(");
-				return executeByRuns(startingBoard, runs, rootRandom.split()).getMove();
+				Node result = executeByRuns(startingBoard, runs, rootRandom.split());
+				return useVisitCountAggregation()
+						? voteByVisitCounts(Collections.singletonList(result))
+						: result.getMove();
 			} else {
 				this.numDeterminizations = numDeterminizations;
 				logger.info("Running {} determinizations :)", numDeterminizations);
@@ -143,7 +149,9 @@ public class MCTS {
 			select(startingBoard, rootNode, rng);
 		logger.debug("Ran {} runs in {}ms.", runs, System.currentTimeMillis() - startTime);
 		recordRootVisits(rootNode);
-		return finalSelection(rootNode, rng);
+		// Under visit-count aggregation the caller needs each determinization's full root
+		// (its child visit counts), not just this tree's single best child.
+		return useVisitCountAggregation() ? rootNode : finalSelection(rootNode, rng);
 	}
 
 	/**
@@ -170,6 +178,8 @@ public class MCTS {
 		}
 		logger.debug("Ran {} runs in {}ms.", runCounter, System.currentTimeMillis() - startTime);
 		recordRootVisits(rootNode);
+		if (useVisitCountAggregation())
+			return rootNode.isValid() ? rootNode : null;
 		return finalSelection(rootNode, rng);
 	}
 
@@ -209,7 +219,8 @@ public class MCTS {
 				numRuns = 0;
 			}
 
-			return vote(finalNodes);
+			// finalNodes are root nodes under visit aggregation, best-child nodes otherwise.
+			return useVisitCountAggregation() ? voteByVisitCounts(finalNodes) : vote(finalNodes);
 
 		} catch (InterruptedException | ExecutionException e) {
 			logger.error("{}", e);
@@ -217,6 +228,44 @@ public class MCTS {
 		} finally {
 			futures.clear();
 		}
+	}
+
+	/**
+	 * Whether to aggregate across determinizations by SUMMED ROOT VISIT COUNTS (the pgx /
+	 * AlphaZero choice) instead of by summed final Q ({@link #vote}). Enabled when PUCT runs
+	 * with a full {@link PuctPriorPolicy} prior: visit counts must be load-bearing for the
+	 * policy prior to influence the chosen move at all — Q-sum aggregation neutralizes it.
+	 */
+	private boolean useVisitCountAggregation() {
+		return puctEnabled && puctPriorPolicy instanceof PuctPriorPolicy;
+	}
+
+	/**
+	 * Aggregates determinizations by summing each root's child visit counts across all trees
+	 * and returning the argmax move. The current player's legal moves (the root children) are
+	 * identical across determinizations — only the hidden cards differ — so the visit sums
+	 * align per move.
+	 *
+	 * @param roots per-determinization root nodes (each child's {@code getGames()} is its visit count)
+	 */
+	private Move voteByVisitCounts(List<Node> roots) throws MCTSException {
+		Map<Move, Double> summedVisits = new HashMap<>();
+		for (Node root : roots) {
+			if (root == null || root.getChildren() == null) continue;
+			for (Node child : root.getChildren())
+				summedVisits.merge(child.getMove(), child.getGames(), Double::sum);
+		}
+		if (summedVisits.isEmpty())
+			throw new MCTSException("There are no moves to vote from. Maybe there was not enough time to explore the tree.");
+
+		Map.Entry<Move, Double> best = null;
+		for (Map.Entry<Move, Double> entry : summedVisits.entrySet()) {
+			logger.debug("{} summed visits across determinizations: {}", entry.getKey(), entry.getValue());
+			if (best == null || entry.getValue() > best.getValue())
+				best = entry;
+		}
+		logger.info("Visit-count aggregation chose {} ({} summed visits)", best.getKey(), best.getValue());
+		return best.getKey();
 	}
 
 	/**
