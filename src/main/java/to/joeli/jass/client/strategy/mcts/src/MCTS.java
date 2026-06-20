@@ -495,29 +495,44 @@ public class MCTS {
 	 */
 	private List<Node> findChildrenPuct(Node node, Board board, double optimisticBias, double pessimisticBias) {
 		List<Node> children = node.getChildren();
-		boolean useHeuristic = puctPriorPolicy != null && puctAlpha > 0.0;
-		// The prior depends only on this node's (fixed) determinized position, so compute it
-		// once and reuse it on every re-traversal — avoids O(runs * depth) policy forward passes.
+		int nLegal = children.size();
+		double otherPrior = nLegal > 1 ? (1.0 - puctAlpha) / (nLegal - 1) : 1.0;
+		double uniformPrior = 1.0 / Math.max(1, nLegal);
+		double sqrtParentN = Math.sqrt(node.getGames() + 1);
+
+		// Resolve the prior P(s,a) source once per node (cached; depends only on the node's
+		// fixed determinized position, so this avoids O(runs * depth) policy forward passes).
+		// Soft mode: a PuctPriorPolicy gives the full softmax distribution over moves (pgx
+		// policy). Argmax-tip mode: a plain PlayoutSelectionPolicy gives one heuristic-best
+		// move weighted by puctAlpha. Otherwise: uniform prior.
+		Map<Move, Double> priorDist = null;
 		Move heuristicBest = null;
-		if (useHeuristic) {
+		if (puctPriorPolicy instanceof PuctPriorPolicy) {
+			if (!node.isPriorDistributionComputed()) {
+				node.setCachedPriorDistribution(((PuctPriorPolicy) puctPriorPolicy).priors(board));
+			}
+			priorDist = node.getCachedPriorDistribution();
+		} else if (puctPriorPolicy != null && puctAlpha > 0.0) {
 			if (!node.isPriorComputed()) {
 				node.setCachedPriorMove(puctPriorPolicy.getBestMove(board));
 			}
 			heuristicBest = node.getCachedPriorMove();
 		}
-		int nLegal = children.size();
-		double otherPrior = nLegal > 1 ? (1.0 - puctAlpha) / (nLegal - 1) : 1.0;
-		double uniformPrior = 1.0 / Math.max(1, nLegal);
-		double sqrtParentN = Math.sqrt(node.getGames() + 1);
+		boolean useSoftPrior = priorDist != null && !priorDist.isEmpty();
 
 		double bestValue = Double.NEGATIVE_INFINITY;
 		ArrayList<Node> bestNodes = new ArrayList<>();
 		for (Node s : children) {
 			if (s.isPruned()) continue;
 			double q = s.getGames() > 0 ? s.getScores()[node.getPlayer()] / s.getGames() : 0.0;
-			double prior = heuristicBest == null
-					? uniformPrior
-					: (s.getMove().equals(heuristicBest) ? puctAlpha : otherPrior);
+			double prior;
+			if (useSoftPrior) {
+				prior = priorDist.getOrDefault(s.getMove(), 0.0);
+			} else if (heuristicBest != null) {
+				prior = s.getMove().equals(heuristicBest) ? puctAlpha : otherPrior;
+			} else {
+				prior = uniformPrior;
+			}
 			double tempBest = q
 					+ puctC * prior * sqrtParentN / (1.0 + s.getGames())
 					+ optimisticBias * s.getOpti()[node.getPlayer()]

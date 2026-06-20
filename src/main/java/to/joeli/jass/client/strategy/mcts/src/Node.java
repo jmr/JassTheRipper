@@ -2,6 +2,7 @@ package to.joeli.jass.client.strategy.mcts.src;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class Node {
@@ -18,13 +19,17 @@ public class Node {
 	private boolean pruned;
 	private boolean valid = true;
 
-	// PUCT prior cache: the heuristic-best move for this node's position, computed once
-	// (lazily, on first PUCT child selection) and reused on every re-traversal. The prior
-	// depends only on this node's determinized position, which is fixed within its tree.
-	// Each determinization tree runs in a single thread (root parallelisation), so no
-	// synchronisation is needed.
+	// PUCT prior cache: computed once (lazily, on first PUCT child selection) and reused on
+	// every re-traversal. The prior depends only on this node's determinized position, which
+	// is fixed within its tree. Each determinization tree runs in a single thread (root
+	// parallelisation), so no synchronisation is needed.
+	// Two variants, used by the two prior modes in MCTS.findChildrenPuct:
+	//   - cachedPriorMove: the single argmax "tip" (heuristic priors)
+	//   - cachedPriorDistribution: the full P(s,a) over moves (soft policy priors)
 	private Move cachedPriorMove;
 	private boolean priorComputed;
+	private Map<Move, Double> cachedPriorDistribution;
+	private boolean priorDistributionComputed;
 
 	/**
 	 * This creates the root node
@@ -273,6 +278,22 @@ public class Node {
 	public void setCachedPriorMove(Move cachedPriorMove) {
 		this.cachedPriorMove = cachedPriorMove;
 		this.priorComputed = true;
+	}
+
+	/** Whether the full PUCT prior distribution for this node has been computed and cached. */
+	public boolean isPriorDistributionComputed() {
+		return priorDistributionComputed;
+	}
+
+	/** The cached PUCT prior distribution P(s,a); valid only once {@link #isPriorDistributionComputed()}. */
+	public Map<Move, Double> getCachedPriorDistribution() {
+		return cachedPriorDistribution;
+	}
+
+	/** Caches the PUCT prior distribution for this node and marks it computed. */
+	public void setCachedPriorDistribution(Map<Move, Double> cachedPriorDistribution) {
+		this.cachedPriorDistribution = cachedPriorDistribution;
+		this.priorDistributionComputed = true;
 	}
 
 	public boolean isPruned() {
