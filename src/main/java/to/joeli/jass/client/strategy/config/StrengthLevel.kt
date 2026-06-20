@@ -42,6 +42,17 @@ enum class StrengthLevel constructor(val numDeterminizationsFactor: Int, val max
     POWERFUL_10X(5, 1000, 2000),      // temporary: 10x numRuns of POWERFUL to test RUNS mode scaling
     POWERFUL_100X(5, 1000, 20000),    // temporary: 100x numRuns of POWERFUL (~reasonable think time on dev machine)
     POWERFUL_100X_DETS(500, 1000, 200), // temporary: 100x numDeterminizationsFactor of POWERFUL (same total compute as 100X)
+
+    // PUCT runs/determination sweep (Component C, real-PUCT validation). With a network leaf,
+    // MCTSHelper divides numRuns by 10, so runs/det = numRuns/10. These fill the gap between
+    // POWERFUL (20 runs/det) and POWERFUL_10X (200 runs/det) to locate where soft-prior PUCT
+    // starts beating the raw prior (pgx crossover was ~sims 40-50, healthy by ~128). Use in
+    // RUNS mode; maxThinkingTime is unused there.
+    SWEEP_32(5, 10000, 320),    // 32 runs/det
+    SWEEP_64(5, 10000, 640),    // 64 runs/det
+    SWEEP_128(5, 10000, 1280),  // 128 runs/det
+    SWEEP_256(5, 10000, 2560),  // 256 runs/det
+
     EXTREME(6, 2000, 400),
     INSANE(7, 2500, 500),
     SUPERMAN(8, 5000, 1000),
