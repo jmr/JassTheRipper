@@ -50,6 +50,29 @@ determinizations by **summed root visit counts** (not Q) when a policy prior is 
   gen-0, negative at gen-1); re-sweep when models change. gen3 is early-project, so this is a
   lower bound.
 
+### Absolute strength vs JassTheRipper's classical bot (calibration, 2026-06-20)
+
+gen3 > gen2 (above) is a *relative* result among weak agents. Absolute calibration triangle
+(100 games each, paired test; mean_diff per pair = 2 games; negative = name1 behind):
+
+| matchup | name1 % of name2 | mean_diff/pair (per-game) | p | sign |
+|:--|:--|:--|:--|:--|
+| gen3 (POWERFUL, value+policy) vs **POWERFUL** (classical) | 75.6% | −43.6 (−22/game) | <0.0001 | 9–41 |
+| gen3 vs **FAST_TEST** (weakest MCTS) | 93.5% | −10.6 (−5/game) | 0.14 (ns) | 19–30 |
+| **POWERFUL** vs **FAST_TEST** | 128.9% | +39.6 (+20/game) | <0.0001 | 39–10 |
+| gen3 @ **SWEEP_256** (256 runs/det) vs **POWERFUL** | 89.2% | −18.0 (−9/game) | 0.006 | 16–31 |
+
+**Strength ordering: POWERFUL ≫ FAST_TEST ≳ gen3.** The pgx agent is **weak in absolute terms** —
+it loses decisively to the classical bot and is even nominally behind the weakest MCTS. Giving
+gen3 ~13× more search (POWERFUL's 20 runs/det → SWEEP_256's 256) halves the deficit vs POWERFUL
+(−22 → −9 pts/game) but does NOT close it, even though 256 runs/det exceeds POWERFUL's own 200.
+
+**Conclusion: the *model* is the limiter, not the JTR integration or search depth.** The
+integration is correct (gen3>gen2 is visible, pipeline works); gen3 is just an early (3rd-gen),
+pgx-simplified-self-play net. This is pgx jass_plan Step 4's external benchmark — answer: not yet
+competitive. The lever is **stronger pgx models** (more generations / net scaling), not more JTR
+search. (FAST_TEST is the weakest CLI baseline; a true random player isn't wired into the arena.)
+
 ## Thesis findings — already ruled out as quality levers at ≥1000 rounds
 
 Joel Niklaus's MSc thesis (`MSc__Joel_Niklaus.pdf`) ran these comparisons at 10 × 100 rounds
