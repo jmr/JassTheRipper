@@ -247,7 +247,20 @@ public class Arena {
 				}
 			}
 		}
-		return playGames(numGames, TrainMode.EVALUATION, null, -1);
+		try {
+			return playGames(numGames, TrainMode.EVALUATION, null, -1);
+		} finally {
+			// Release each player's MCTS thread pools (non-daemon) so callers — e.g. the
+			// ApplicationArena CLI — can exit instead of hanging on lingering pool threads.
+			shutDownStrategies();
+		}
+	}
+
+	/** Shuts down every player's strategy, releasing the MCTS thread pools held this match. */
+	private void shutDownStrategies() {
+		for (int team = 0; team < 2; team++)
+			for (Player player : gameSession.getPlayersOfTeam(team))
+				player.getJassStrategy().shutDown();
 	}
 
 	private double runOnlyNetworks() {

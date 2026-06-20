@@ -343,8 +343,10 @@ TODO Make new experiments with the improvements so far:
 		this.pgxEstimator = pgxEstimator;
 	}
 
+	@Override
 	public void shutDown() {
-		this.mctsHelper.shutDown();
+		if (this.mctsHelper != null)
+			this.mctsHelper.shutDown();
 	}
 
 	public void setConfig(Config config) {

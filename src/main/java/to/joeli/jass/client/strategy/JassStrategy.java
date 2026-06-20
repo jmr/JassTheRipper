@@ -16,4 +16,11 @@ public interface JassStrategy {
     default void onMoveMade(Move move) {}
     default void onGameFinished() {}
     default void onSessionFinished() {}
+
+    /**
+     * Releases resources held by the strategy (e.g. MCTS thread pools). No-op by default;
+     * callers must invoke this when done with the strategy so its non-daemon threads do not
+     * keep the JVM alive.
+     */
+    default void shutDown() {}
 }
