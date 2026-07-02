@@ -75,6 +75,34 @@ pgx-simplified-self-play net. This is pgx jass_plan Step 4's external benchmark 
 competitive. The lever is **stronger pgx models** (more generations / net scaling), not more JTR
 search. (FAST_TEST is the weakest CLI baseline; a true random player isn't wired into the arena.)
 
+### gen-4 / gen-5b re-calibration (2026-07-02) — gap to POWERFUL roughly halved
+
+Two generations later (gen-4, then gen-5b — pgx's `docs/jass_experiment_log.md` has the full
+training history), same export pipeline, same real-PUCT harness, re-run to answer the question
+the 2026-06-20 DECISION left open: does pgx's self-relative policy climb since gen-3 (gen-3→gen-4
+raw +15, gen-4→gen-5b raw +27–31 via a step2-mix-ablation fix) convert into absolute strength
+against POWERFUL, or wash out like gen-2-vs-gen-3 did under the old argmax-tip+Q-sum setup?
+
+**gen-5b vs gen-4, real PUCT, SWEEP_64 (500 pairs / 1000 games, seed 42):**
+**+16.7/pair (+8.35 pts/game), t=7.53, p=0.0000, sign 297W-174L-29T** — the internal pgx climb
+(gen-5b +11.8/+16.2 raw vs gen-4) reproduces externally, same pattern as gen3>gen2.
+
+**gen-5b vs POWERFUL (classical), 250 paired games across 2 seeds:**
+
+| matchup | pairs | mean_diff/pair | per-game | p |
+|:--|:--|:--|:--|:--|
+| gen-5b vs POWERFUL (seed 42) | 50 | −12.6 | −6.3 | 0.089 (ns) |
+| gen-5b vs POWERFUL (seed 43) | 200 | −20.7 | −10.35 | 0.0000 |
+| **combined (pair-weighted)** | 250 | **≈−19.1** | **≈−9.5** | decisive |
+
+**The absolute-strength gap to POWERFUL has roughly HALVED since gen-3: −22/game → ≈−9.5/game.**
+Answer to the open question: **yes, the self-relative policy gains substantially convert to
+absolute strength** — gen-5b is still a clear, significant loser to POWERFUL, but far closer than
+gen-3 was. gen-4's own POWERFUL calibration was never run (deferred straight to gen-5b), so this
+is a two-point trendline (gen-3, gen-5b), not a full per-generation curve. Models exported to
+`src/main/resources/models/{pv_gen4_s128,pv_gen5b_s128}/export` (gitignored, regenerate via
+pgx's `scripts/extract_pv_weights.py` → `scripts/export_pv_savedmodel.py`).
+
 ## Thesis findings — already ruled out as quality levers at ≥1000 rounds
 
 Joel Niklaus's MSc thesis (`MSc__Joel_Niklaus.pdf`) ran these comparisons at 10 × 100 rounds
