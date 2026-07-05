@@ -43,6 +43,10 @@ import java.util.Map;
  *   --heavy-rounds2=&lt;n&gt;        Use heavy rollouts for tricks 0..n-1 (random after) for team 1
  *   --trump-cond1              Round-0 trump-conditioned determinization for team 0
  *   --trump-cond2              Round-0 trump-conditioned determinization for team 1
+ *   --cheating1                Team 0 sees the true hidden hands — no determinization sampling
+ *                              (with --pgx-raw1: a single forward pass on the true state, the
+ *                              exact pgx-internal raw config; diagnostic only, not a fair player)
+ *   --cheating2                Same for team 1
  *   --pgx-model1=&lt;path&gt;        Load pgx SavedModel for team 0 and use value head as MCTS leaf
  *   --pgx-model2=&lt;path&gt;        Load pgx SavedModel for team 1 and use value head as MCTS leaf
  *   --pgx-policy1              Also use policy head as PUCT prior for team 0 (enables PUCT)
@@ -117,6 +121,8 @@ public class ApplicationArena {
 		}
 		if (flags.containsKey("trump-cond" + suffix))
 			mc.setTrumpConditionedDeterminization(true);
+		if (flags.containsKey("cheating" + suffix))
+			mc.setCheating(true);
 
 		Config config = new Config(mc);
 		if (flags.containsKey("pgx-model" + suffix)) {
