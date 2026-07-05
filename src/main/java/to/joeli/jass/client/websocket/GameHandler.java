@@ -131,7 +131,7 @@ public class GameHandler {
 	 * The decisions are still made by the player. The advisor is not added as a player in the server but only as an advisor.
 	 *
 	 * @param remoteTeams
-	 * TODO: see TODO.md — advisor identity model: overwriting localPlayer.id with the advised player's id
+	 * TODO: see doc/todo.md — advisor identity model: overwriting localPlayer.id with the advised player's id
 	 * is fragile. localPlayer keeps name "X-Advisor" while id becomes the advised player's id, so
 	 * Player.equals (which compares both) would mis-match a separately-constructed Player for that seat.
 	 * This works today only because PlayerMapper returns the cached localPlayer object on id lookup.
