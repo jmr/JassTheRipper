@@ -152,11 +152,27 @@ rows above).
 | gen-7b_es **raw** vs **POWERFUL** (classical) | −17.0 | −8.5 | −6.202 | 0.0000 | 85W-154L-11T, p=0.0000 | raw loses clearly |
 | gen-7b_es **PUCT** vs gen-7b_es **raw** | +20.3 | +10.15 | 7.344 | 0.0000 | 171W-60L-19T, p=0.0000 | **search helps a lot** |
 
-The three external numbers are internally consistent: raw ≈ POWERFUL−8.5, PUCT ≈ raw+10.15 ≈
-POWERFUL+1.65 — matching the near-tie observed directly (gen-7b_es PUCT vs POWERFUL, previous
-section: −0.25/game, ns). **But the headline is the opposite of pgx's own internal probe**
-(gen-7 PUCT@64 vs its own raw policy: −6.3/game, p=0.0033, "search hurts, deploy raw"). Under
-JTR's real-PUCT harness with the identical gen-7b_es net, **search substantially helps** — raw
+`--cheating{1,2}` also added: the team sees the true hidden hands, no determinization sampling
+(with `--pgx-raw`, this collapses to a single forward pass on the true state — diagnostic only,
+not a fair player). Checks whether determinization noise, not the policy itself, was suppressing
+raw's strength:
+
+| matchup | mean_diff/pair | per-game | t | p | sign test | verdict |
+|:--|:--|:--|:--|:--|:--|:--|
+| gen-7b_es **raw + cheating** vs **POWERFUL** | −15.0 | −7.5 | −4.994 | 0.0000 | 86W-156L-8T, p=0.0000 | still loses clearly |
+
+Perfect information barely moves the needle (−7.5 vs −8.5/game determinized) — **rules out
+determinization noise as the explanation**. Raw policy is genuinely weaker than POWERFUL's
+search even with the imperfect-information problem removed entirely; the gap PUCT closes comes
+from the search process itself (visit-count aggregation over the tree), not from compensating for
+sampling noise in the raw policy's inputs.
+
+The three external numbers (raw, PUCT-vs-raw, PUCT-vs-POWERFUL) are internally consistent: raw ≈
+POWERFUL−8.5, PUCT ≈ raw+10.15 ≈ POWERFUL+1.65 — matching the near-tie observed directly (gen-7b_es
+PUCT vs POWERFUL, previous section: −0.25/game, ns). **But the headline is the opposite of pgx's
+own internal probe** (gen-7 PUCT@64 vs its own raw policy: −6.3/game, p=0.0033, "search hurts,
+deploy raw"). Under JTR's real-PUCT harness with the identical gen-7b_es net, **search
+substantially helps** — raw
 policy alone does not hold the tie against POWERFUL; PUCT does. Both results are decisive at 250
 pairs (p=0.0000), well clear of the ~240-pair threshold pgx needed for their own probe — no
 extension to 1000 games was needed to resolve this.
