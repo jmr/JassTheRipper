@@ -136,6 +136,37 @@ contradiction of gen-7's real (raw-policy) strength gain over gen-6b_es.
 whether the PUCT harness is now *understating* gen-7 relative to gen-6, and whether raw policy
 alone already beats or matches POWERFUL more cheaply than PUCT@64 does.
 
+### gen-7b_es raw policy vs PUCT (2026-07-05) — JTR's external harness contradicts pgx's internal "search hurts" call
+
+`--pgx-raw{1,2}` added to `ApplicationArena`/`Arena`: plays the argmax of the pgx policy head,
+averaged over the same per-round determinization count RUNS mode would use — forward passes only,
+no tree search, no rollouts, no value head. Per-team search flags are rejected on a raw team
+(`--scalingN`, `--ucbN`, `--puct*N`, `--heavy-roundsN`, `--pgx-policyN`) since raw play ignores
+them; `--strengthN` is kept only for its `numDeterminizationsFactor`. Trumpf selection is
+untouched (still rule-based) on all teams. Both matches below: 250 pairs / 500 games, seed 42,
+gen-7b_es net on every raw/PUCT side (SWEEP_64 → 45 dets at trick 0, identical budget to the PUCT
+rows above).
+
+| matchup | mean_diff/pair | per-game | t | p | sign test | verdict |
+|:--|:--|:--|:--|:--|:--|:--|
+| gen-7b_es **raw** vs **POWERFUL** (classical) | −17.0 | −8.5 | −6.202 | 0.0000 | 85W-154L-11T, p=0.0000 | raw loses clearly |
+| gen-7b_es **PUCT** vs gen-7b_es **raw** | +20.3 | +10.15 | 7.344 | 0.0000 | 171W-60L-19T, p=0.0000 | **search helps a lot** |
+
+The three external numbers are internally consistent: raw ≈ POWERFUL−8.5, PUCT ≈ raw+10.15 ≈
+POWERFUL+1.65 — matching the near-tie observed directly (gen-7b_es PUCT vs POWERFUL, previous
+section: −0.25/game, ns). **But the headline is the opposite of pgx's own internal probe**
+(gen-7 PUCT@64 vs its own raw policy: −6.3/game, p=0.0033, "search hurts, deploy raw"). Under
+JTR's real-PUCT harness with the identical gen-7b_es net, **search substantially helps** — raw
+policy alone does not hold the tie against POWERFUL; PUCT does. Both results are decisive at 250
+pairs (p=0.0000), well clear of the ~240-pair threshold pgx needed for their own probe — no
+extension to 1000 games was needed to resolve this.
+
+**Reading:** pgx's "deploy raw" decision was made on their own internal PUCT implementation and
+self-play test conditions (own tree/determinization scheme, own opponent pool). It does not
+transfer to JTR's ISMCTS-with-determinizations-and-visit-aggregation harness — here, search over
+the same net remains a clear, significant win. Conclusion for JTR's own deployment: **keep PUCT
+enabled**; do not switch to raw-policy-only play based on the pgx-side recommendation.
+
 ## Thesis findings — already ruled out as quality levers at ≥1000 rounds
 
 Joel Niklaus's MSc thesis (`MSc__Joel_Niklaus.pdf`) ran these comparisons at 10 × 100 rounds
