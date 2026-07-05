@@ -103,6 +103,39 @@ is a two-point trendline (gen-3, gen-5b), not a full per-generation curve. Model
 `src/main/resources/models/{pv_gen4_s128,pv_gen5b_s128}/export` (gitignored, regenerate via
 pgx's `scripts/extract_pv_weights.py` → `scripts/export_pv_savedmodel.py`).
 
+### gen-6b_es / gen-7b_es re-calibration (2026-07-05) — gap to POWERFUL closes to ZERO
+
+Two more generations later, both attn-architecture (`PolicyValueNetAttn`), same real-PUCT
+harness. gen-6b_es and gen-7b_es exported to
+`src/main/resources/models/{pv_gen6b_es_s128,pv_gen7b_es_s128}/export`; `pgx_pv/export` symlinked
+to gen-7b_es for the unit tests. All four matches below: 250 pairs / 500 games, seed 42.
+
+| matchup | mean_diff/pair | per-game | t | p | sign test | verdict |
+|:--|:--|:--|:--|:--|:--|:--|
+| gen-6b_es vs gen-5b (SWEEP_64) | +13.5 | +6.75 | 4.894 | 0.0000 | 141W-93L-16T, p=0.0021 | gen6 significantly stronger |
+| gen-7b_es vs gen-6b_es (SWEEP_64) | +2.0 | +1.0 | 0.699 | 0.4849 | 124W-108L-18T, p=0.3247 | wash |
+| gen-6b_es vs **POWERFUL** (classical) | +0.7 | +0.35 | 0.236 | 0.8135 | 118W-122L-10T, p=0.8465 | tied |
+| gen-7b_es vs **POWERFUL** (classical) | −0.5 | −0.25 | −0.184 | 0.8542 | 112W-120L-18T, p=0.6459 | tied |
+
+**Headline: the absolute-strength gap to POWERFUL has closed to zero.** Trendline: gen-3
+(≈−22/game) → gen-5b (≈−9.5/game) → **gen-6b_es / gen-7b_es (flat, both ns)**. Both generations
+are now statistically indistinguishable from classical POWERFUL under JTR's real-PUCT harness —
+first time the pgx lineage has caught up to the classical baseline rather than just narrowing the
+gap.
+
+**gen-7b_es vs gen-6b_es washing under PUCT matches pgx's own finding**
+(`docs/jass_experiment_log.md`, 2026-07-04): gen-7's promotion gate against gen-6b_es was flat
+under PUCT@64 (+1.1, p=0.61) even though gen-7's *raw* policy beat gen-6b_es decisively (+5.2 to
++10.2 across seeds, p<0.003). pgx separately measured gen-7 PUCT@64 vs its own raw policy at
+**−6.3/game (p=0.0033) — search actively hurts** at this model strength, and pgx's own DECISION is
+to deploy raw policy (~65× cheaper per move) rather than PUCT@64 from gen-7 onward. Our external
+real-PUCT arena reproducing the same wash is independent confirmation of that mechanism, not a
+contradiction of gen-7's real (raw-policy) strength gain over gen-6b_es.
+
+**Next:** raw-policy arena comparison (gen-7b_es raw vs gen-6b_es raw, and raw vs POWERFUL) to see
+whether the PUCT harness is now *understating* gen-7 relative to gen-6, and whether raw policy
+alone already beats or matches POWERFUL more cheaply than PUCT@64 does.
+
 ## Thesis findings — already ruled out as quality levers at ≥1000 rounds
 
 Joel Niklaus's MSc thesis (`MSc__Joel_Niklaus.pdf`) ran these comparisons at 10 × 100 rounds
