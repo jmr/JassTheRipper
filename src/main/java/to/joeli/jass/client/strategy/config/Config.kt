@@ -15,6 +15,12 @@ class Config {
     var isPgxValueUsed = false
     /** Route the pgx PolicyValueNet policy head into PUCT priors. */
     var isPgxPolicyUsed = false
+    /**
+     * Play the argmax of the pgx policy head directly, without MCTS. The net takes fully
+     * determinized observations, so the policy is averaged over the same number of
+     * determinizations MCTS would use for the round — forward passes only, no search.
+     */
+    var isPgxRawPlayUsed = false
     /** Path to the pgx TF2 SavedModel directory; null means pgx is disabled. */
     var pgxModelPath: String? = null
 

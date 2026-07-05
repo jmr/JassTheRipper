@@ -227,7 +227,7 @@ public class Arena {
 		PgxPolicyValueEstimator[] estimators = new PgxPolicyValueEstimator[configs.length];
 		for (int i = 0; i < configs.length; i++) {
 			String pgxPath = configs[i].getPgxModelPath();
-			if (pgxPath != null && (configs[i].isPgxValueUsed() || configs[i].isPgxPolicyUsed())) {
+			if (pgxPath != null && (configs[i].isPgxValueUsed() || configs[i].isPgxPolicyUsed() || configs[i].isPgxRawPlayUsed())) {
 				estimators[i] = new PgxPolicyValueEstimator();
 				estimators[i].loadModel(pgxPath);
 				if (configs[i].isPgxPolicyUsed()) {

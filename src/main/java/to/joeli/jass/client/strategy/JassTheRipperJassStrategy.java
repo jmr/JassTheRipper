@@ -10,6 +10,7 @@ import to.joeli.jass.client.strategy.config.MCTSConfig;
 import to.joeli.jass.client.strategy.config.StrengthLevel;
 import to.joeli.jass.client.strategy.config.TrumpfSelectionMethod;
 import to.joeli.jass.client.strategy.exceptions.MCTSException;
+import to.joeli.jass.client.strategy.helpers.CardKnowledgeBase;
 import to.joeli.jass.client.strategy.helpers.CardSelectionHelper;
 import to.joeli.jass.client.strategy.helpers.MCTSHelper;
 import to.joeli.jass.client.strategy.helpers.TrumpfSelectionHelper;
@@ -23,6 +24,8 @@ import to.joeli.jass.client.strategy.training.networks.ScoreEstimator;
 import to.joeli.jass.game.cards.Card;
 import to.joeli.jass.game.mode.Mode;
 
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.Set;
 
 
@@ -242,7 +245,10 @@ TODO Make new experiments with the improvements so far:
 				card = Iterables.getOnlyElement(possibleCards);
 				logger.info("Only one possible card to play: {}", card);
 			} else { // Start searching for a good card
-				if (config.isMctsEnabled()) {
+				if (config.isPgxRawPlayUsed() && getPgxEstimator() != null && getPgxEstimator().isLoaded()) {
+					card = choosePgxRawCard(availableCards, possibleCards, game);
+					logger.info("Chose card based on raw pgx policy (no search)");
+				} else if (config.isMctsEnabled()) {
 					try {
 						if (mctsHelper == null) throw new AssertionError();
 						Move move = mctsHelper.predictMove(availableCards, session, false, game.isShifted());
@@ -283,6 +289,53 @@ TODO Make new experiments with the improvements so far:
 			logger.error("Something unexpectedly went terribly wrong! But could catch exception and chose random card now.");
 			return CardSelectionHelper.getRandomCard(availableCards, game);
 		}
+	}
+
+	/**
+	 * Raw pgx policy play (no search). The net is trained on fully determinized
+	 * observations, so it cannot be queried on the real imperfect-information state:
+	 * sample the same number of determinizations MCTS would use for this round in RUNS
+	 * mode, average the masked policy distribution over them, and play the argmax.
+	 * Forward passes only — no tree search, no rollouts.
+	 *
+	 * Honored MCTSConfig knobs: cardStrengthLevel.numDeterminizationsFactor (budget),
+	 * trumpConditionedDeterminization and cheating (how worlds are built; cheating uses
+	 * the true hands in a single forward pass — the exact pgx-internal raw config), plus
+	 * the cards estimator if enabled. Everything that parameterizes the search itself is
+	 * deliberately ignored: runMode / numRuns / runsScaling / maxThinkingTime (there is
+	 * no tree), MCTSHelper's TIME-mode 2x-determinization bonus and RUNS-mode /10 runs
+	 * discount for leaf estimators, hardPruningEnabled (every legal card stays a
+	 * candidate), and the UCB/PUCT constants. The value head is never called, and trumpf
+	 * selection is untouched — it follows trumpfSelectionMethod as configured; the net's
+	 * trump logits (indices 36-42) are not consulted.
+	 */
+	private Card choosePgxRawCard(Set<Card> availableCards, Set<Card> possibleCards, Game game) {
+		final MCTSConfig mctsConfig = config.getMctsConfig();
+		final boolean cheating = mctsConfig.getCheating();
+		final int numDeterminizations = cheating ? 1
+				: (9 - game.getCurrentRound().getRoundNumber())
+						* mctsConfig.getCardStrengthLevel().getNumDeterminizationsFactor();
+		final Map<Card, Double> summed = new EnumMap<>(Card.class);
+		for (int i = 0; i < numDeterminizations; i++) {
+			Game determinizedGame = new Game(game);
+			if (!cheating) {
+				CardKnowledgeBase.sampleCardDeterminizationToPlayers(determinizedGame, availableCards,
+						getCardsEstimator(), mctsConfig.getTrumpConditionedDeterminization());
+			}
+			Map<Card, Float> prior = getPgxEstimator().predictPriorOverLegal(determinizedGame, possibleCards);
+			prior.forEach((c, p) -> summed.merge(c, p.doubleValue(), Double::sum));
+		}
+		Card best = null;
+		double bestSum = Double.NEGATIVE_INFINITY;
+		for (Map.Entry<Card, Double> entry : summed.entrySet()) {
+			if (entry.getValue() > bestSum) {
+				bestSum = entry.getValue();
+				best = entry.getKey();
+			}
+		}
+		logger.info("Raw pgx policy over {} determinizations: argmax {} (avg prob {})",
+				numDeterminizations, best, bestSum / numDeterminizations);
+		return best;
 	}
 
 	private void waitUntilTimeIsUp(long endingTime) {
@@ -331,10 +384,10 @@ TODO Make new experiments with the improvements so far:
 
 	/**
 	 * Returns the pgx estimator if it is loaded and at least one of the pgx heads is enabled.
-	 * Returns {@code null} otherwise (value/policy heads opt-in separately via Config).
+	 * Returns {@code null} otherwise (value/policy/raw-play opt-in separately via Config).
 	 */
 	public PgxPolicyValueEstimator getPgxEstimator() {
-		if ((config.isPgxValueUsed() || config.isPgxPolicyUsed()) && pgxEstimator != null)
+		if ((config.isPgxValueUsed() || config.isPgxPolicyUsed() || config.isPgxRawPlayUsed()) && pgxEstimator != null)
 			return pgxEstimator;
 		return null;
 	}

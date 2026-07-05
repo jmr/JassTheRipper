@@ -47,6 +47,19 @@ import java.util.Map;
  *   --pgx-model2=&lt;path&gt;        Load pgx SavedModel for team 1 and use value head as MCTS leaf
  *   --pgx-policy1              Also use policy head as PUCT prior for team 0 (enables PUCT)
  *   --pgx-policy2              Also use policy head as PUCT prior for team 1 (enables PUCT)
+ *   --pgx-raw1                 Play argmax of pgx policy head for team 0 — NO search; policy
+ *                              averaged over the round's determinization count (needs --pgx-model1;
+ *                              strength level only sets numDeterminizationsFactor)
+ *   --pgx-raw2                 Same for team 1 (needs --pgx-model2)
+ *
+ * --pgx-rawN replaces MCTS for card play. Per-team search flags on a raw team are
+ * REJECTED (they would be silently ignored): --scalingN, --ucbN, --puct*N,
+ * --heavy-roundsN, --pgx-policyN. --strengthN stays allowed (only its
+ * numDeterminizationsFactor is used) and the global --mode stays allowed (the other
+ * team may search); there is no TIME-mode determinization bonus or hard pruning for a
+ * raw team (see JassTheRipperJassStrategy#choosePgxRawCard for the full list of
+ * ignored knobs). Trumpf selection is NOT taken over by the net — it still follows
+ * the configured TrumpfSelectionMethod (rule-based by default) on all teams.
  *   --seed=&lt;n&gt;                 Random seed (default: 42)
  * </pre>
  */
@@ -112,6 +125,20 @@ public class ApplicationArena {
 		}
 		if (flags.containsKey("pgx-policy" + suffix))
 			config.setPgxPolicyUsed(true);
+		if (flags.containsKey("pgx-raw" + suffix)) {
+			if (!flags.containsKey("pgx-model" + suffix))
+				throw new IllegalArgumentException("--pgx-raw" + suffix + " requires --pgx-model" + suffix);
+			// Fail fast on per-team search flags that raw play would silently ignore.
+			for (String searchFlag : new String[]{
+					"pgx-policy", "puct", "puct-prior", "puct-alpha", "puct-c",
+					"ucb", "heavy-rounds", "scaling"}) {
+				if (flags.containsKey(searchFlag + suffix)) {
+					throw new IllegalArgumentException("--" + searchFlag + suffix
+							+ " has no effect with --pgx-raw" + suffix + " (raw play skips MCTS)");
+				}
+			}
+			config.setPgxRawPlayUsed(true);
+		}
 		return config;
 	}
 }
