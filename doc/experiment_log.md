@@ -209,6 +209,31 @@ where gen-7 was −0.5/pair (tied): the ~9-pt shift is ~2σ across two independe
 (SE≈2.7/pair each), so noise-plausible; the paired head-to-head is the more reliable read and
 says gen-7 ≈ gen-8 ≈ just-above-POWERFUL, with gen-9 a clear step up.
 
+### gen-9 raw vs PUCT (2026-07-07) — search's edge over raw has shrunk to noise
+
+Repeat of the gen-7 raw-vs-PUCT probe (two sections up) with the gen-9 net: gen-9 **PUCT**
+(SWEEP_64, `--pgx-policy`) vs gen-9 **raw** (`--pgx-raw`, same net, SWEEP_64 only for its
+`numDeterminizationsFactor` → identical determinization budget). 250 pairs / 500 games, seed 42.
+
+| matchup | mean_diff/pair | per-game | t | p | sign test | verdict |
+|:--|:--|:--|:--|:--|:--|:--|
+| gen-9 **PUCT** vs gen-9 **raw** | +3.0 | +1.5 | 1.411 | 0.1596 | 93W-71L-86T, p=0.1007 | ns — search barely ahead |
+| gen-9 **raw** vs **POWERFUL** (classical) | +5.0 | +2.5 | 1.782 | 0.0760 | 128W-107L-15T, p=0.1919 | raw trends ahead (marginal) |
+
+**Search's advantage over raw policy has collapsed from gen-7 to gen-9.** gen-7: PUCT beat raw by
++10.15/game (p=0.0000, "search helps a lot"). gen-9: +1.5/game, ns (p=0.16). As the policy net got
+stronger, raw play caught up to what tree search adds — swinging toward pgx's own internal finding
+that search stops helping (even hurts) at higher model strength, and away from the gen-7 result
+that had contradicted it. High tie rate (86/250 pairs) reflects both sides sharing the same net.
+
+This does *not* make PUCT worthless for gen-9 in absolute terms — gen-9 PUCT still beats POWERFUL by
++5.05/game (previous section). Transitivity predicted **raw gen-9 ≈ POWERFUL +3.5/game** (PUCT +5.05
+− the +1.5 PUCT-over-raw edge); the direct run measured **+2.5/game (p=0.076, marginal)** — same
+direction, within noise of the prediction. So **raw gen-9 has crossed above POWERFUL**, a sharp
+reversal from raw gen-7, which *lost* to POWERFUL by −8.5/game (two sections up): the raw policy
+gained ≈+11/game over two generations. The gen-9 raw-vs-POWERFUL edge is a trend, not decisive at
+250 pairs (p=0.076); a second seed or 500 pairs would settle whether it is a clear win or a tie.
+
 ## Strength curve: FAST / STRONG / EXTREME vs POWERFUL
 
 Characterises the saturation curve around POWERFUL. All matches are RUNS mode, FLAT
