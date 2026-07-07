@@ -179,6 +179,36 @@ transfer to JTR's ISMCTS-with-determinizations-and-visit-aggregation harness —
 the same net remains a clear, significant win. Conclusion for JTR's own deployment: **keep PUCT
 enabled**; do not switch to raw-policy-only play based on the pgx-side recommendation.
 
+### gen-8d_mz / gen-9 re-calibration (2026-07-07) — pgx crosses ABOVE POWERFUL
+
+Two more generations (gen-8d_mz, gen-9), both attention architecture
+(`PolicyValueNetAttn`, the default from gen-6 onward), same real-PUCT harness as the
+gen-6/7 calibration. Exported via `./scripts/import_pgx_models.sh` (auto-detects attn from
+the `pool_query` key) to `src/main/resources/models/{pv_gen8d_mz_s128,pv_gen9_s128}/export`.
+All matches: 250 pairs / 500 games, seed 42, `SWEEP_64` strength (64 runs/det), real PUCT
+(`--pgx-policy`) on every model side; vs POWERFUL the opponent is classical POWERFUL.
+
+| matchup | mean_diff/pair | per-game | t | p | sign test | verdict |
+|:--|:--|:--|:--|:--|:--|:--|
+| gen-8d_mz vs gen-7b_es (SWEEP_64) | −0.1 | −0.05 | −0.057 | 0.9549 | 118W-103L-29T, p=0.3463 | wash |
+| gen-9 vs gen-8d_mz (SWEEP_64) | +8.9 | +4.45 | 3.452 | 0.0007 | 129W-83L-38T, p=0.0019 | gen-9 significantly stronger |
+| gen-8d_mz vs **POWERFUL** (classical) | +8.4 | +4.2 | 3.016 | 0.0028 | 134W-108L-8T, p=0.1078 | gen-8 beats POWERFUL |
+| gen-9 vs **POWERFUL** (classical) | +10.1 | +5.05 | 3.628 | 0.0003 | 145W-93L-12T, p=0.0009 | gen-9 beats POWERFUL |
+
+**Headline: the pgx lineage has crossed *above* classical POWERFUL for the first time.** Both
+gen-8d_mz and gen-9 significantly beat POWERFUL under JTR's real-PUCT harness (+4.2 and +5.05
+pts/game, p=0.0028 / p=0.0003). Full trendline of the absolute-strength gap to POWERFUL:
+gen-3 (≈−22/game) → gen-5b (≈−9.5) → gen-6b_es / gen-7b_es (≈0, tied) → **gen-8d_mz / gen-9
+(≈+4 to +5, ahead)**. The lineage first caught up (gen-6/7) and has now pulled clearly ahead.
+
+**The gen-to-gen climb resumed at gen-9.** gen-8d_mz ≈ gen-7b_es was a wash (p=0.95, gen-8
+scored 99.91% of gen-7's points) — the same PUCT-flattens-policy-gains pattern gen-7-vs-gen-6
+showed. But gen-9 > gen-8d_mz is decisive (+4.45/game, p=0.0007), so the wash was a one-gen
+plateau, not a ceiling. Note gen-8 ≈ gen-7 head-to-head yet gen-8 lands +8.4/pair on POWERFUL
+where gen-7 was −0.5/pair (tied): the ~9-pt shift is ~2σ across two independent 250-pair runs
+(SE≈2.7/pair each), so noise-plausible; the paired head-to-head is the more reliable read and
+says gen-7 ≈ gen-8 ≈ just-above-POWERFUL, with gen-9 a clear step up.
+
 ## Strength curve: FAST / STRONG / EXTREME vs POWERFUL
 
 Characterises the saturation curve around POWERFUL. All matches are RUNS mode, FLAT
