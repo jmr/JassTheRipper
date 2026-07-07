@@ -25,6 +25,7 @@ import to.joeli.jass.game.cards.Card;
 import to.joeli.jass.game.mode.Mode;
 
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -151,6 +152,12 @@ TODO Make new experiments with the improvements so far:
 			printCards(availableCards);
 
 			Mode mode = TrumpfSelectionHelper.getRandomMode(shifted);
+
+			// Raw pgx policy trump selection overrides the configured method when enabled.
+			if (config.isPgxTrumpUsed() && getPgxEstimator() != null && getPgxEstimator().isLoaded()) {
+				logger.info("Chose trumpf based on raw pgx policy (no search)");
+				return choosePgxTrumpf(availableCards, session, shifted);
+			}
 
 			if (config.getTrumpfSelectionMethod() == TrumpfSelectionMethod.RULE_BASED)
 				mode = TrumpfSelectionHelper.predictTrumpf(availableCards, shifted);
@@ -338,6 +345,52 @@ TODO Make new experiments with the improvements so far:
 		return best;
 	}
 
+	/**
+	 * Determinizations for raw trump selection, mirroring the trumpf-phase budget MCTS would use
+	 * in RUNS mode: {@code ROUND_MULTIPLIER (10) × numDeterminizationsFactor}
+	 * (see {@code MCTSHelper.computeNumDeterminizations}). Round 0, so the round discount doesn't apply.
+	 */
+	private static final int TRUMP_ROUND_MULTIPLIER = 10;
+
+	/**
+	 * Raw pgx policy trump selection (no search), the trumpf-phase analogue of
+	 * {@link #choosePgxRawCard}. The net takes fully-determinized full-information observations, so
+	 * the real imperfect-information state (only our own 9 cards known) can't be fed directly:
+	 * sample determinizations of the 27 hidden cards, average the masked trump policy
+	 * (logits 36–42) over them, and play the argmax mode. Forward passes only — no tree search,
+	 * no value head. Under {@code cheating} the session already holds the true hands, so a single
+	 * forward pass on the real deal suffices (diagnostic only).
+	 *
+	 * <p>The trump policy is trained on the same full-state trunk as the card policy (pgx
+	 * {@code jass_value_net.py}), so determinization matters exactly as it does for raw card play.
+	 */
+	private Mode choosePgxTrumpf(Set<Card> availableCards, GameSession session, boolean shifted) {
+		final MCTSConfig mctsConfig = config.getMctsConfig();
+		final boolean cheating = mctsConfig.getCheating();
+		final int numDeterminizations = cheating ? 1
+				: TRUMP_ROUND_MULTIPLIER * mctsConfig.getTrumpfStrengthLevel().getNumDeterminizationsFactor();
+		final Map<Mode, Double> summed = new HashMap<>();
+		for (int i = 0; i < numDeterminizations; i++) {
+			GameSession determinizedSession = new GameSession(session);
+			if (!cheating) {
+				CardKnowledgeBase.sampleCardDeterminizationToPlayers(determinizedSession, availableCards, shifted);
+			}
+			Map<Mode, Float> prior = getPgxEstimator().predictTrumpPriorOverLegal(determinizedSession, shifted);
+			prior.forEach((m, p) -> summed.merge(m, p.doubleValue(), Double::sum));
+		}
+		Mode best = null;
+		double bestSum = Double.NEGATIVE_INFINITY;
+		for (Map.Entry<Mode, Double> entry : summed.entrySet()) {
+			if (entry.getValue() > bestSum) {
+				bestSum = entry.getValue();
+				best = entry.getKey();
+			}
+		}
+		logger.info("Raw pgx trump policy over {} determinizations: argmax {} (avg prob {})",
+				numDeterminizations, best, bestSum / numDeterminizations);
+		return best;
+	}
+
 	private void waitUntilTimeIsUp(long endingTime) {
 		while (System.currentTimeMillis() < endingTime) {
 			try {
@@ -387,7 +440,7 @@ TODO Make new experiments with the improvements so far:
 	 * Returns {@code null} otherwise (value/policy/raw-play opt-in separately via Config).
 	 */
 	public PgxPolicyValueEstimator getPgxEstimator() {
-		if ((config.isPgxValueUsed() || config.isPgxPolicyUsed() || config.isPgxRawPlayUsed()) && pgxEstimator != null)
+		if ((config.isPgxValueUsed() || config.isPgxPolicyUsed() || config.isPgxRawPlayUsed() || config.isPgxTrumpUsed()) && pgxEstimator != null)
 			return pgxEstimator;
 		return null;
 	}

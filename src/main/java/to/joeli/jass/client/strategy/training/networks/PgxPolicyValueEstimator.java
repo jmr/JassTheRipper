@@ -8,10 +8,14 @@ import org.tensorflow.SessionFunction;
 import org.tensorflow.ndarray.StdArrays;
 import org.tensorflow.types.TFloat32;
 import to.joeli.jass.client.game.Game;
+import to.joeli.jass.client.game.GameSession;
 import to.joeli.jass.client.strategy.helpers.PgxFeatureEncoder;
 import to.joeli.jass.game.cards.Card;
+import to.joeli.jass.game.mode.Mode;
 
 import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -104,12 +108,19 @@ public class PgxPolicyValueEstimator {
      * @return raw forward-pass result (logits 0–42 and unscaled value)
      */
     private ForwardResult forward(Game game) {
+        return forward(PgxFeatureEncoder.encode(game));
+    }
+
+    /**
+     * Runs one forward pass through the network on already-encoded features.
+     * Shared by the card-play path ({@link PgxFeatureEncoder#encode(Game)}) and the
+     * trumpf-selection path ({@link PgxFeatureEncoder#encodeTrumpSelection}).
+     */
+    private ForwardResult forward(PgxFeatureEncoder.Features feat) {
         if (!isLoaded()) {
             throw new IllegalStateException(
                     "PgxPolicyValueEstimator: model not loaded. Call loadModel() first.");
         }
-
-        PgxFeatureEncoder.Features feat = PgxFeatureEncoder.encode(game);
 
         // Wrap (36, 12) → (1, 36, 12) and (20,) → (1, 20) for batched inference
         float[][][] cmBatch = {feat.cardMatrix};
@@ -204,6 +215,60 @@ public class PgxPolicyValueEstimator {
         }
 
         return masked;
+    }
+
+    // ── Trump head ────────────────────────────────────────────────────────────
+
+    /** First trump-declaration logit index; {@code 36+code} for mode code 0–5, 42 for Schiebe. */
+    private static final int TRUMP_LOGIT_OFFSET = 36;
+    /** Logit index for the Schiebe (shift) action. */
+    private static final int SCHIEBE_LOGIT = 42;
+
+    /**
+     * Returns a probability distribution over the legal trump declarations for the pre-trump
+     * observation of {@code session}, suitable for raw (search-free) trump selection.
+     *
+     * <p>Softmaxes over the legal trump logits (indices 36–42 of the 43-way policy head:
+     * {@code 36+code} for the six modes ♦♥♠♣/Obenabe/Undeufe, 42 for Schiebe) and returns the
+     * result keyed by {@link Mode}. Schiebe is a legal action only when the forehand has not yet
+     * passed (i.e. {@code !shifted}); the six declarations are always legal.
+     *
+     * @param session a fully determinized session in the trumpf-selection phase
+     * @param shifted whether the forehand already passed (removes Schiebe from the legal set)
+     * @return probability distribution over the legal {@link Mode}s
+     */
+    public Map<Mode, Float> predictTrumpPriorOverLegal(GameSession session, boolean shifted) {
+        float[] logits = forward(PgxFeatureEncoder.encodeTrumpSelection(session, shifted)).logits;
+
+        // Legal trump actions: the six declarations always, Schiebe only before a pass.
+        List<Mode> legalModes = new java.util.ArrayList<>(7);
+        int[] legalLogitIndex = new int[shifted ? 6 : 7];
+        for (int code = 0; code <= 5; code++) {
+            legalModes.add(Mode.from(code));
+            legalLogitIndex[code] = TRUMP_LOGIT_OFFSET + code;
+        }
+        if (!shifted) {
+            legalModes.add(Mode.shift());
+            legalLogitIndex[6] = SCHIEBE_LOGIT;
+        }
+
+        // Numerically stable softmax over the legal-action logits only.
+        float maxLogit = Float.NEGATIVE_INFINITY;
+        for (int idx : legalLogitIndex) {
+            if (logits[idx] > maxLogit) maxLogit = logits[idx];
+        }
+        float sumExp = 0f;
+        float[] exp = new float[legalLogitIndex.length];
+        for (int i = 0; i < legalLogitIndex.length; i++) {
+            exp[i] = (float) Math.exp(logits[legalLogitIndex[i]] - maxLogit);
+            sumExp += exp[i];
+        }
+
+        Map<Mode, Float> probs = new HashMap<>();
+        for (int i = 0; i < legalModes.size(); i++) {
+            probs.put(legalModes.get(i), exp[i] / sumExp);
+        }
+        return probs;
     }
 
     // ── Internal result type ──────────────────────────────────────────────────

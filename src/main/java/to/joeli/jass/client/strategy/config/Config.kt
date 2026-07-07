@@ -21,6 +21,12 @@ class Config {
      * determinizations MCTS would use for the round — forward passes only, no search.
      */
     var isPgxRawPlayUsed = false
+    /**
+     * Select trump by the argmax of the pgx policy head (indices 36–42), averaged over
+     * determinizations — no search. Independent of card play: can be combined with any
+     * card-play method (MCTS, PUCT, raw). Overrides [trumpfSelectionMethod] when enabled.
+     */
+    var isPgxTrumpUsed = false
     /** Path to the pgx TF2 SavedModel directory; null means pgx is disabled. */
     var pgxModelPath: String? = null
 

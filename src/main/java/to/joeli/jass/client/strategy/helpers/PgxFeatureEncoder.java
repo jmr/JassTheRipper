@@ -1,6 +1,7 @@
 package to.joeli.jass.client.strategy.helpers;
 
 import to.joeli.jass.client.game.Game;
+import to.joeli.jass.client.game.GameSession;
 import to.joeli.jass.client.game.Move;
 import to.joeli.jass.client.game.Player;
 import to.joeli.jass.client.game.Round;
@@ -207,6 +208,60 @@ public final class PgxFeatureEncoder {
             hd[7 + trickNum] = 1f;       // [7:16] trick_num one-hot
         }
         hd[16 + trickLeaderSeat] = 1f;  // [16:20] trick_leader one-hot
+
+        return new Features(cm, hd);
+    }
+
+    /**
+     * Encodes the <em>pre-trump</em> observation (pgx {@code phase == 0}, {@code trump == -1})
+     * from the perspective of the player who is about to declare trump.
+     *
+     * <p>{@link #encode(Game)} cannot be used here: before a mode is chosen there is no
+     * {@link Game} (only a {@link GameSession}) and no current-round mode. This mirrors what
+     * pgx's {@code value_features()} produces when {@code state.trump < 0} and no card has been
+     * played: the trump one-hot {@code [0:6]} and the "is-trump" column (11) are all zero;
+     * {@code trick_num} is 0; the trick leader is the forehand (the trumpf-selecting player, who
+     * leads trick 0 even after a shift); collected/in-trick columns (4–10) are all zero.
+     *
+     * <p>The session must be fully determinized — all four {@code player.getCards()} sets
+     * populated (via {@link CardKnowledgeBase#sampleCardDeterminizationToPlayers(GameSession, Set, boolean)}
+     * for the imperfect-information case, or the real deal when cheating).
+     *
+     * @param session a determinized game session in the trumpf-selection phase
+     * @param shifted whether the forehand already passed (so the current declarer is the partner)
+     * @return the {@code (36,12)} card matrix and {@code (20,)} header as float32 arrays
+     */
+    public static Features encodeTrumpSelection(GameSession session, boolean shifted) {
+        float[][] cm = new float[NUM_CARDS][CARD_MATRIX_COLS];
+        float[] hd = new float[HEADER_SIZE];
+
+        Player forehand = session.getTrumpfSelectingPlayer();
+        // After a shift the partner declares; otherwise the forehand declares. This is "me".
+        Player me = shifted ? session.getPartnerOfPlayer(forehand) : forehand;
+        int meSeat      = me.getSeatId();
+        int partnerSeat = (meSeat + 2) & 3;
+        int leftOppSeat = (meSeat + 1) & 3;
+        int rightOppSeat= (meSeat + 3) & 3;
+
+        Player[] bySeat = new Player[4];
+        for (Player p : session.getPlayersInInitialPlayingOrder()) {
+            bySeat[p.getSeatId()] = p;
+        }
+
+        // Columns 0-3: who holds each card (after determinization). Columns 4-11 stay zero:
+        // nothing collected or played yet, and no trump is declared.
+        for (Card card : Card.values()) {
+            float[] row = cm[pgxIndex(card)];
+            row[0] = bySeat[meSeat].getCards().contains(card)        ? 1f : 0f;
+            row[1] = bySeat[partnerSeat].getCards().contains(card)   ? 1f : 0f;
+            row[2] = bySeat[leftOppSeat].getCards().contains(card)   ? 1f : 0f;
+            row[3] = bySeat[rightOppSeat].getCards().contains(card)  ? 1f : 0f;
+        }
+
+        // Header: trump one-hot [0:6] stays zero (not declared).
+        hd[6] = shifted ? 1f : 0f;               // [6] forehand_passed
+        hd[7] = 1f;                              // [7:16] trick_num one-hot → trick 0
+        hd[16 + forehand.getSeatId()] = 1f;      // [16:20] trick_leader = forehand
 
         return new Features(cm, hd);
     }

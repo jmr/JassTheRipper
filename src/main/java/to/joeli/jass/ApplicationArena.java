@@ -55,6 +55,12 @@ import java.util.Map;
  *                              averaged over the round's determinization count (needs --pgx-model1;
  *                              strength level only sets numDeterminizationsFactor)
  *   --pgx-raw2                 Same for team 1 (needs --pgx-model2)
+ *   --pgx-trump1               Select trump by argmax of the pgx policy head (indices 36–42)
+ *                              for team 0 — NO search; policy averaged over the trumpf-phase
+ *                              determinization count. Independent of card play: combine with any
+ *                              card method (MCTS/PUCT/raw). Needs --pgx-model1; trumpfStrength
+ *                              only sets numDeterminizationsFactor.
+ *   --pgx-trump2               Same for team 1 (needs --pgx-model2)
  *
  * --pgx-rawN replaces MCTS for card play. Per-team search flags on a raw team are
  * REJECTED (they would be silently ignored): --scalingN, --ucbN, --puct*N,
@@ -62,8 +68,9 @@ import java.util.Map;
  * numDeterminizationsFactor is used) and the global --mode stays allowed (the other
  * team may search); there is no TIME-mode determinization bonus or hard pruning for a
  * raw team (see JassTheRipperJassStrategy#choosePgxRawCard for the full list of
- * ignored knobs). Trumpf selection is NOT taken over by the net — it still follows
- * the configured TrumpfSelectionMethod (rule-based by default) on all teams.
+ * ignored knobs). Card-play trumpf selection is taken over by the net only with
+ * --pgx-trumpN; otherwise it follows the configured TrumpfSelectionMethod (rule-based
+ * by default). --pgx-trumpN overrides TrumpfSelectionMethod for that team.
  *   --seed=&lt;n&gt;                 Random seed (default: 42)
  * </pre>
  */
@@ -144,6 +151,11 @@ public class ApplicationArena {
 				}
 			}
 			config.setPgxRawPlayUsed(true);
+		}
+		if (flags.containsKey("pgx-trump" + suffix)) {
+			if (!flags.containsKey("pgx-model" + suffix))
+				throw new IllegalArgumentException("--pgx-trump" + suffix + " requires --pgx-model" + suffix);
+			config.setPgxTrumpUsed(true);
 		}
 		return config;
 	}
