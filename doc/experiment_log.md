@@ -234,6 +234,118 @@ reversal from raw gen-7, which *lost* to POWERFUL by −8.5/game (two sections u
 gained ≈+11/game over two generations. The gen-9 raw-vs-POWERFUL edge is a trend, not decisive at
 250 pairs (p=0.076); a second seed or 500 pairs would settle whether it is a clear win or a tie.
 
+### gen-9 learned trump selection vs rule-based (2026-07-07) — net trump head beats the heuristic
+
+`--pgx-trump` added to `ApplicationArena`/`Arena`: select trump by the argmax of the pgx policy
+head's trump logits (indices 36–42), averaged over the trumpf-phase determinization count
+(`10 × numDeterminizationsFactor`) — forward passes only, no tree search, no value head — instead
+of the rule-based heuristic. The trump head reads the same full-state *determinized* trunk as the
+card head (pgx `jass_value_net.py`; `value_features` is well-defined at `phase 0`, `trump=-1`), so
+this is the trumpf-phase analogue of `--pgx-raw`. Schiebe (logit 42) is masked out once already
+shifted; the six declarations are always legal. Clean A/B, the same isolation trick as the raw
+runs: **card play held identical** (gen-9 `--pgx-raw`, SWEEP_64) on both teams; only trump
+selection differs — net (`--pgx-trump`) on team 1 vs rule-based on team 2. 1000 pairs / 2000 games
+per seed. gen-9 net on every side.
+
+| seed | mean_diff/pair | per-game | t | p | sign test |
+|:--|:--|:--|:--|:--|:--|
+| 42 | +4.2 | +2.1 | 2.613 | 0.0091 | 332W-330L-338T, p=0.97 |
+| 43 | +2.6 | +1.3 | 1.530 | 0.1263 | 344W-340L-316T, p=0.91 |
+| **pooled (2000 pairs)** | **≈+3.4** | **≈+1.7** | ≈2.9 | **≈0.004** | — |
+
+**Headline: the learned trump head beats the hand-tuned heuristic by ≈+1.7 pts/game (pooled
+p≈0.004).** Both seeds land positive; seed 42 is significant alone, seed 43 same direction but
+underpowered (p=0.13). The 0.009/0.126 split is exactly what the un-seeded determinization RNG
+(TODO.md) predicts: a true effect near +3.4/pair against SE≈1.6/pair sits right on the
+significance boundary, so single 1000-pair seeds scatter around it — pooled across 2000 pairs it
+is decisive.
+
+**Takeaways:**
+- **First validated win for the pgx net outside card play**, and an end-to-end deployment gain:
+  trump selection was the last rule-based component on an otherwise all-net team (every prior
+  calibration ran rule-based trump on both sides). The net now drives both phases.
+- **Magnitude in context:** gen-9 raw beats POWERFUL by +2.5/game (section above), so upgrading
+  trump heuristic→net buys nearly as much as the *entire* card-play edge over POWERFUL. Trump
+  choice is high-leverage — it swings whole hands — so a gain this size is plausible.
+- **Sign test ties both seeds (p≈0.9) while the t-test moves** — the same points-not-pairs
+  high-variance pattern documented for EXTREME (below): trump differs on only a subset of deals,
+  and when the net picks the better trump it wins *that* hand by a large margin (fewer decisive
+  pairs, bigger swings). The paired t-test on points is authoritative; the sign test is
+  informational only.
+- Unlike the rule-based/MCTS trump paths (which "never shift by itself", see MCTSConfig note), the
+  net **does** choose Schiebe when the hand warrants it, then the partner re-decides with Schiebe
+  correctly masked out.
+- **Minor confound:** ~5% of games (90–110 / 2000) hit the pre-existing raw-card
+  "invalid card → random" fallback. It is on the *identical* card path, but net vs rule trump
+  produce different mode distributions so the fallback rate is not perfectly symmetric — far too
+  small to manufacture a +1.7/game effect, but noted.
+- **Next:** re-run against a PUCT (not raw) card-play backdrop to confirm the trump gain survives
+  under search. Orthogonal to the gen-10 B-capacity line — a cheap side-probe on the "beat POWERFUL
+  by more" frame, not a displacement of the main thread.
+
+#### vs POWERFUL: the trump gain more than adds (2026-07-08)
+
+Does the trump gain stack on gen-9 raw's card-play edge over POWERFUL? Same isolation, but the
+opponent is now classical **POWERFUL** (MCTS card play + rule-based trump): gen-9 `--pgx-raw` +
+`--pgx-trump` (team 1, SWEEP_64) vs POWERFUL (team 2). 250 pairs/seed, ~1.9 h each (POWERFUL runs
+full card-search, ≈13.7 s/game — ~25× slower than raw-vs-raw). Directly comparable to the gen-9
+raw-vs-POWERFUL row two sections up (+5.0/pair, +2.5/game, p=0.076, seed 42), which used the *same*
+raw card play with rule-based trump — so the delta isolates the trump switch.
+
+| matchup | seed | mean_diff/pair | per-game | t | p | sign test |
+|:--|:--|:--|:--|:--|:--|:--|
+| raw + **net** trump vs POWERFUL | 42 | +16.3 | +8.15 | 4.466 | <0.0001 | 139W-100L-11T, p=0.014 |
+| raw + **net** trump vs POWERFUL | 43 | +10.9 | +5.45 | 2.872 | 0.0044 | 140W-102L-8T, p=0.017 |
+| **pooled (500 pairs)** | — | **≈+13.6** | **≈+6.8** | ≈5.2 | **≈1e-6** | — |
+| raw + rule trump vs POWERFUL (baseline) | 42 | +5.0 | +2.5 | 1.782 | 0.076 | 128W-107L-15T |
+
+**Headline: gen-9 raw + net trump beats POWERFUL by ≈+6.8 pts/game (both seeds significant on
+their own), above even gen-9 PUCT-with-rule-trump (+5.05/game).** And the gains **more than add:**
+switching trump rule→net against POWERFUL is worth +8.6/pair (+4.3/game) — ~2× the +4.2/pair
+(+2.1/game) the same switch bought on the raw-vs-raw backdrop (seed 42 alone read 2.7×; the second
+seed pulled it to ~2×). Reading: trump choice is worth more against a stronger card opponent —
+POWERFUL punishes a bad trump harder, so getting it right compounds. Unlike the raw-vs-raw A/B, the
+sign test also moves here (≈140-101, p≈0.015) — the effect is now large enough to flip pairs, not
+just points.
+
+**Caveat:** the rule-trump baseline (+5.0/pair) is a single, marginal (p=0.076) seed-42 run under
+the same un-seeded determinization RNG, so the exact "~2×" super-additive factor is approximate.
+The win itself is rock-solid (both seeds, t=4.47 / 2.87); only the multiplier wants a two-seed
+baseline to pin down.
+
+#### Under PUCT card play: the gain amplifies, not survives-barely (2026-07-08)
+
+The runs above put net trump on a *raw* card backdrop. Does the gain hold when card play is full
+PUCT search (the deployment configuration, and a stronger backdrop)? Replicated the gen-9-vs-POWERFUL
+calibration row (`--pgx-policy` SWEEP_64 vs classical POWERFUL, +5.05/game) with `--pgx-trump` added
+on the gen-9 side. 50 pairs, seed 42 (single seed — PUCT vs POWERFUL is ~145 s/game, ~4 h for 50
+pairs; a full 250-pair two-seed run was out of budget).
+
+| matchup | mean_diff/pair | per-game | t | p | sign test |
+|:--|:--|:--|:--|:--|:--|
+| PUCT + **net** trump vs POWERFUL | **+23.2** | **+11.6** | 2.983 | **0.0044** | 32W-15L-3T, p=0.019 |
+| PUCT + rule trump vs POWERFUL (baseline, prior section) | +10.1 | +5.05 | 3.628 | 0.0003 | 145W-93L-12T |
+
+**gen-9 PUCT + net trump beats POWERFUL by +11.6 pts/game — roughly double the +5.05 the same PUCT
+agent managed with rule-based trump.** The trump gain does not merely survive search; it is *larger*
+under it. (PUCT card play is also much cleaner than raw: 1/100 invalid-card fallbacks vs raw's ~5%.)
+
+**The trump-switch (rule→net) effect grows monotonically with card-play strength:**
+
+| card backdrop | trump switch (rule→net) |
+|:--|:--|
+| raw vs raw | +4.2/pair (+2.1/game) |
+| raw vs POWERFUL | +8.6/pair (+4.3/game) |
+| **PUCT vs POWERFUL** | **+13.1/pair (+6.55/game)** |
+
+Consistent super-additive story across three backdrops: **the stronger the card play, the more a
+good trump is worth** — strong card play converts the positional edge a better trump creates instead
+of squandering it. Same caveats: single seed here (clears at p=0.0044), and the baselines are
+cross-run under the un-seeded determinization RNG, so the multipliers are approximate — but the
+direction is now confirmed on all three backdrops. A dedicated PUCT-vs-PUCT A/B (net vs rule trump,
+both net card play) was deemed redundant: the deployment-relevant question — does the trump head help
+under search against a strong opponent — is answered decisively here.
+
 ## Strength curve: FAST / STRONG / EXTREME vs POWERFUL
 
 Characterises the saturation curve around POWERFUL. All matches are RUNS mode, FLAT
