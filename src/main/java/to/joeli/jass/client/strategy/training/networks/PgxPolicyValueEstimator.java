@@ -228,17 +228,34 @@ public class PgxPolicyValueEstimator {
      * Returns a probability distribution over the legal trump declarations for the pre-trump
      * observation of {@code session}, suitable for raw (search-free) trump selection.
      *
-     * <p>Softmaxes over the legal trump logits (indices 36–42 of the 43-way policy head:
-     * {@code 36+code} for the six modes ♦♥♠♣/Obenabe/Undeufe, 42 for Schiebe) and returns the
-     * result keyed by {@link Mode}. Schiebe is a legal action only when the forehand has not yet
-     * passed (i.e. {@code !shifted}); the six declarations are always legal.
+     * <p>Thin wrapper around {@link #predictTrumpOverLegal} for callers that only need the
+     * softmaxed probabilities (e.g. raw trump play); see that method for the raw logits and
+     * value-head estimate from the same forward pass, used by the position-analysis tooling.
      *
      * @param session a fully determinized session in the trumpf-selection phase
      * @param shifted whether the forehand already passed (removes Schiebe from the legal set)
      * @return probability distribution over the legal {@link Mode}s
      */
     public Map<Mode, Float> predictTrumpPriorOverLegal(GameSession session, boolean shifted) {
-        float[] logits = forward(PgxFeatureEncoder.encodeTrumpSelection(session, shifted)).logits;
+        return predictTrumpOverLegal(session, shifted).probabilities;
+    }
+
+    /**
+     * Runs one forward pass on the pre-trump observation of {@code session} and returns the
+     * softmaxed probabilities, the raw (pre-softmax) logits, and the value-head estimate, all
+     * restricted to (or evaluated at) the legal trump declarations.
+     *
+     * <p>Softmaxes over the legal trump logits (indices 36–42 of the 43-way policy head:
+     * {@code 36+code} for the six modes ♦♥♠♣/Obenabe/Undeufe, 42 for Schiebe). Schiebe is a legal
+     * action only when the forehand has not yet passed (i.e. {@code !shifted}); the six
+     * declarations are always legal.
+     *
+     * @param session a fully determinized session in the trumpf-selection phase
+     * @param shifted whether the forehand already passed (removes Schiebe from the legal set)
+     */
+    public TrumpForwardResult predictTrumpOverLegal(GameSession session, boolean shifted) {
+        ForwardResult forwardResult = forward(PgxFeatureEncoder.encodeTrumpSelection(session, shifted));
+        float[] logits = forwardResult.logits;
 
         // Legal trump actions: the six declarations always, Schiebe only before a pass.
         List<Mode> legalModes = new java.util.ArrayList<>(7);
@@ -250,6 +267,11 @@ public class PgxPolicyValueEstimator {
         if (!shifted) {
             legalModes.add(Mode.shift());
             legalLogitIndex[6] = SCHIEBE_LOGIT;
+        }
+
+        Map<Mode, Float> logitsByMode = new HashMap<>();
+        for (int i = 0; i < legalModes.size(); i++) {
+            logitsByMode.put(legalModes.get(i), logits[legalLogitIndex[i]]);
         }
 
         // Numerically stable softmax over the legal-action logits only.
@@ -268,7 +290,27 @@ public class PgxPolicyValueEstimator {
         for (int i = 0; i < legalModes.size(); i++) {
             probs.put(legalModes.get(i), exp[i] / sumExp);
         }
-        return probs;
+
+        return new TrumpForwardResult(probs, logitsByMode, forwardResult.value * TARGET_SCALE);
+    }
+
+    /**
+     * Result of {@link #predictTrumpOverLegal}: the trump-selection forward pass restricted to
+     * the legal declarations, plus the value-head estimate for the underlying determinized world.
+     */
+    public static final class TrumpForwardResult {
+        /** Softmaxed probability distribution over the legal {@link Mode}s. */
+        public final Map<Mode, Float> probabilities;
+        /** Raw (pre-softmax) logits for the legal {@link Mode}s. */
+        public final Map<Mode, Float> logits;
+        /** Value-head estimate (score differential, scaled by {@link #TARGET_SCALE}) for the world. */
+        public final double value;
+
+        TrumpForwardResult(Map<Mode, Float> probabilities, Map<Mode, Float> logits, double value) {
+            this.probabilities = probabilities;
+            this.logits = logits;
+            this.value = value;
+        }
     }
 
     // ── Internal result type ──────────────────────────────────────────────────

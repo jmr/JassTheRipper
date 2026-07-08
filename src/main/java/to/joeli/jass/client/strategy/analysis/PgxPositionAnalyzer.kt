@@ -12,9 +12,16 @@ import java.util.EnumMap
 
 /**
  * The result of [PgxPositionAnalyzer.analyzeTrump]: legal trump declarations ranked by mean
- * pgx-policy probability over the determinizations sampled, best first.
+ * pgx-policy probability over the determinizations sampled, best first, alongside the mean raw
+ * (pre-softmax) logit per mode and the mean value-head estimate — both diagnostic, not used by
+ * raw trump play (which only takes [best]).
  */
-data class TrumpAnalysis(val ranked: List<Pair<Mode, Double>>, val numDeterminizations: Int) {
+data class TrumpAnalysis(
+    val ranked: List<Pair<Mode, Double>>,
+    val meanLogits: Map<Mode, Double>,
+    val meanValue: Double,
+    val numDeterminizations: Int
+) {
     /** Argmax mode — what [PgxPositionAnalyzer]-driven raw play would choose. */
     val best: Mode get() = ranked.first().first
 }
@@ -66,20 +73,25 @@ class PgxPositionAnalyzer @JvmOverloads constructor(
         val numDeterminizations = if (cheating) 1
             else TRUMP_ROUND_MULTIPLIER * mctsConfig.trumpfStrengthLevel.numDeterminizationsFactor
 
-        val summed = HashMap<Mode, Double>()
+        val summedProbs = HashMap<Mode, Double>()
+        val summedLogits = HashMap<Mode, Double>()
+        var summedValue = 0.0
         repeat(numDeterminizations) {
             val determinizedSession = GameSession(session)
             if (!cheating) {
                 CardKnowledgeBase.sampleCardDeterminizationToPlayers(determinizedSession, availableCards, shifted)
             }
-            val prior = estimator.predictTrumpPriorOverLegal(determinizedSession, shifted)
-            prior.forEach { (mode, p) -> summed.merge(mode, p.toDouble(), Double::plus) }
+            val result = estimator.predictTrumpOverLegal(determinizedSession, shifted)
+            result.probabilities.forEach { (mode, p) -> summedProbs.merge(mode, p.toDouble(), Double::plus) }
+            result.logits.forEach { (mode, l) -> summedLogits.merge(mode, l.toDouble(), Double::plus) }
+            summedValue += result.value
         }
 
-        val ranked = summed.entries
+        val ranked = summedProbs.entries
             .map { it.key to it.value / numDeterminizations }
             .sortedByDescending { it.second }
-        return TrumpAnalysis(ranked, numDeterminizations)
+        val meanLogits = summedLogits.mapValues { it.value / numDeterminizations }
+        return TrumpAnalysis(ranked, meanLogits, summedValue / numDeterminizations, numDeterminizations)
     }
 
     /**

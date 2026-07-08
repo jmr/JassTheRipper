@@ -32,13 +32,21 @@ task arenaStartScripts(type: CreateStartScripts) {
     classpath = startScripts.classpath
 }
 
-installDist.dependsOn arenaStartScripts
+task analyzeStartScripts(type: CreateStartScripts) {
+    mainClass = 'to.joeli.jass.ApplicationAnalyze'
+    applicationName = 'JassTheRipperAnalyze'
+    outputDir = new File(project.buildDir, 'scripts/analyze')
+    classpath = startScripts.classpath
+}
+
+installDist.dependsOn arenaStartScripts, analyzeStartScripts
 
 distributions {
     main {
         contents {
             into('bin') {
                 from(arenaStartScripts)
+                from(analyzeStartScripts)
                 filePermissions {
                     unix(0755)
                 }
@@ -53,6 +61,18 @@ task(runExperiment, dependsOn: 'classes', type: JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
     args 'CollectDataSet' // Retrieve with args[0]
     systemProperty 'simple.message', 'Hello ' // Retrieve with System.getProperty("simple.message")
+}
+
+// Quick position-analysis CLI, e.g.:
+//   ./gradlew analyze -Pmyargs='--cards=SA SK SQ SJ S10 HA HK H10 D7'
+// For normal shell quoting instead of the comma-split -Pmyargs convention, build the
+// JassTheRipperAnalyze binary via `./gradlew installDist` and run it directly.
+task(analyze, dependsOn: 'classes', type: JavaExec) {
+    mainClass = 'to.joeli.jass.ApplicationAnalyze'
+    classpath = sourceSets.main.runtimeClasspath
+    if (project.hasProperty("myargs")) {
+        args(myargs.split(','))
+    }
 }
 
 task(startServer, dependsOn: 'classes', type: JavaExec) {
