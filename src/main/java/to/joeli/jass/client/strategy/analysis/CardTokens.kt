@@ -11,6 +11,7 @@ import java.util.Locale
 object CardTokens {
 
     /** Parses a space- or comma-separated list of cards, each in HSLU short-code or enum-name form. */
+    @JvmStatic
     fun parseCards(spec: String): Set<Card> {
         val tokens = spec.split(',', ' ').map { it.trim() }.filter { it.isNotEmpty() }
         val cards = tokens.map(::parseCard)
@@ -19,6 +20,7 @@ object CardTokens {
         return distinct
     }
 
+    @JvmStatic
     fun parseCard(token: String): Card {
         try {
             return Card.getCard(token)
