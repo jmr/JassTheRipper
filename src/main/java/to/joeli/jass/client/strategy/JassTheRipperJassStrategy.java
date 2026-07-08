@@ -9,8 +9,10 @@ import to.joeli.jass.client.strategy.config.Config;
 import to.joeli.jass.client.strategy.config.MCTSConfig;
 import to.joeli.jass.client.strategy.config.StrengthLevel;
 import to.joeli.jass.client.strategy.config.TrumpfSelectionMethod;
+import to.joeli.jass.client.strategy.analysis.CardAnalysis;
+import to.joeli.jass.client.strategy.analysis.PgxPositionAnalyzer;
+import to.joeli.jass.client.strategy.analysis.TrumpAnalysis;
 import to.joeli.jass.client.strategy.exceptions.MCTSException;
-import to.joeli.jass.client.strategy.helpers.CardKnowledgeBase;
 import to.joeli.jass.client.strategy.helpers.CardSelectionHelper;
 import to.joeli.jass.client.strategy.helpers.MCTSHelper;
 import to.joeli.jass.client.strategy.helpers.TrumpfSelectionHelper;
@@ -24,9 +26,6 @@ import to.joeli.jass.client.strategy.training.networks.ScoreEstimator;
 import to.joeli.jass.game.cards.Card;
 import to.joeli.jass.game.mode.Mode;
 
-import java.util.EnumMap;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
 
 
@@ -315,42 +314,18 @@ TODO Make new experiments with the improvements so far:
 	 * candidate), and the UCB/PUCT constants. The value head is never called, and trumpf
 	 * selection is untouched — it follows trumpfSelectionMethod as configured; the net's
 	 * trump logits (indices 36-42) are not consulted.
+	 *
+	 * <p>Delegates the determinization-averaging to {@link PgxPositionAnalyzer}, which is also
+	 * used by the standalone position-analysis CLI to report the full ranked distribution
+	 * instead of only this argmax.
 	 */
 	private Card choosePgxRawCard(Set<Card> availableCards, Set<Card> possibleCards, Game game) {
-		final MCTSConfig mctsConfig = config.getMctsConfig();
-		final boolean cheating = mctsConfig.getCheating();
-		final int numDeterminizations = cheating ? 1
-				: (9 - game.getCurrentRound().getRoundNumber())
-						* mctsConfig.getCardStrengthLevel().getNumDeterminizationsFactor();
-		final Map<Card, Double> summed = new EnumMap<>(Card.class);
-		for (int i = 0; i < numDeterminizations; i++) {
-			Game determinizedGame = new Game(game);
-			if (!cheating) {
-				CardKnowledgeBase.sampleCardDeterminizationToPlayers(determinizedGame, availableCards,
-						getCardsEstimator(), mctsConfig.getTrumpConditionedDeterminization());
-			}
-			Map<Card, Float> prior = getPgxEstimator().predictPriorOverLegal(determinizedGame, possibleCards);
-			prior.forEach((c, p) -> summed.merge(c, p.doubleValue(), Double::sum));
-		}
-		Card best = null;
-		double bestSum = Double.NEGATIVE_INFINITY;
-		for (Map.Entry<Card, Double> entry : summed.entrySet()) {
-			if (entry.getValue() > bestSum) {
-				bestSum = entry.getValue();
-				best = entry.getKey();
-			}
-		}
+		CardAnalysis analysis = new PgxPositionAnalyzer(getPgxEstimator(), config, getCardsEstimator())
+				.analyzeCard(game, availableCards, possibleCards);
 		logger.info("Raw pgx policy over {} determinizations: argmax {} (avg prob {})",
-				numDeterminizations, best, bestSum / numDeterminizations);
-		return best;
+				analysis.getNumDeterminizations(), analysis.getBest(), analysis.getRanked().get(0).getSecond());
+		return analysis.getBest();
 	}
-
-	/**
-	 * Determinizations for raw trump selection, mirroring the trumpf-phase budget MCTS would use
-	 * in RUNS mode: {@code ROUND_MULTIPLIER (10) × numDeterminizationsFactor}
-	 * (see {@code MCTSHelper.computeNumDeterminizations}). Round 0, so the round discount doesn't apply.
-	 */
-	private static final int TRUMP_ROUND_MULTIPLIER = 10;
 
 	/**
 	 * Raw pgx policy trump selection (no search), the trumpf-phase analogue of
@@ -363,32 +338,15 @@ TODO Make new experiments with the improvements so far:
 	 *
 	 * <p>The trump policy is trained on the same full-state trunk as the card policy (pgx
 	 * {@code jass_value_net.py}), so determinization matters exactly as it does for raw card play.
+	 *
+	 * <p>Delegates to {@link PgxPositionAnalyzer}; see {@link #choosePgxRawCard}.
 	 */
 	private Mode choosePgxTrumpf(Set<Card> availableCards, GameSession session, boolean shifted) {
-		final MCTSConfig mctsConfig = config.getMctsConfig();
-		final boolean cheating = mctsConfig.getCheating();
-		final int numDeterminizations = cheating ? 1
-				: TRUMP_ROUND_MULTIPLIER * mctsConfig.getTrumpfStrengthLevel().getNumDeterminizationsFactor();
-		final Map<Mode, Double> summed = new HashMap<>();
-		for (int i = 0; i < numDeterminizations; i++) {
-			GameSession determinizedSession = new GameSession(session);
-			if (!cheating) {
-				CardKnowledgeBase.sampleCardDeterminizationToPlayers(determinizedSession, availableCards, shifted);
-			}
-			Map<Mode, Float> prior = getPgxEstimator().predictTrumpPriorOverLegal(determinizedSession, shifted);
-			prior.forEach((m, p) -> summed.merge(m, p.doubleValue(), Double::sum));
-		}
-		Mode best = null;
-		double bestSum = Double.NEGATIVE_INFINITY;
-		for (Map.Entry<Mode, Double> entry : summed.entrySet()) {
-			if (entry.getValue() > bestSum) {
-				bestSum = entry.getValue();
-				best = entry.getKey();
-			}
-		}
+		TrumpAnalysis analysis = new PgxPositionAnalyzer(getPgxEstimator(), config, getCardsEstimator())
+				.analyzeTrump(session, availableCards, shifted);
 		logger.info("Raw pgx trump policy over {} determinizations: argmax {} (avg prob {})",
-				numDeterminizations, best, bestSum / numDeterminizations);
-		return best;
+				analysis.getNumDeterminizations(), analysis.getBest(), analysis.getRanked().get(0).getSecond());
+		return analysis.getBest();
 	}
 
 	private void waitUntilTimeIsUp(long endingTime) {
