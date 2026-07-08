@@ -1,11 +1,11 @@
 package to.joeli.jass
 
+import to.joeli.jass.client.strategy.analysis.CardTokens
 import to.joeli.jass.client.strategy.analysis.PgxPositionAnalyzer
 import to.joeli.jass.client.strategy.config.Config
 import to.joeli.jass.client.strategy.config.StrengthLevel
 import to.joeli.jass.client.strategy.helpers.GameSessionBuilder
 import to.joeli.jass.client.strategy.training.networks.PgxPolicyValueEstimator
-import to.joeli.jass.game.cards.Card
 import java.util.Locale
 
 /**
@@ -49,7 +49,7 @@ object ApplicationAnalyze {
         val cardsFlag = flags["cards"]
             ?: throw IllegalArgumentException(
                 "--cards=<9 cards> is required, e.g. --cards=\"SA SK SQ SJ S10 HA HK H10 D7\"")
-        val cards = parseCards(cardsFlag)
+        val cards = CardTokens.parseCards(cardsFlag)
         require(cards.size == 9) { "Expected 9 distinct cards, got ${cards.size}: $cards" }
 
         val shifted = flags.containsKey("shifted")
@@ -79,28 +79,6 @@ object ApplicationAnalyze {
         analysis.ranked.forEach { (mode, prob) ->
             val logit = analysis.meanLogits.getValue(mode)
             println(String.format(Locale.ROOT, "%-12s %7.1f%% %10.3f", mode.toString(), prob * 100, logit))
-        }
-    }
-
-    /** Parses a space- or comma-separated list of cards, each in HSLU short-code or enum-name form. */
-    private fun parseCards(spec: String): Set<Card> {
-        val tokens = spec.split(',', ' ').map { it.trim() }.filter { it.isNotEmpty() }
-        val cards = tokens.map(::parseCard)
-        val distinct = LinkedHashSet(cards)
-        require(distinct.size == cards.size) { "Duplicate card in --cards: $spec" }
-        return distinct
-    }
-
-    private fun parseCard(token: String): Card {
-        try {
-            return Card.getCard(token)
-        } catch (e: Exception) {
-            try {
-                return Card.valueOf(token.uppercase(Locale.ROOT))
-            } catch (e2: Exception) {
-                throw IllegalArgumentException(
-                    "Unrecognized card '$token' (expected HSLU short code like SA/H10, or enum name like SPADE_ACE)", e2)
-            }
         }
     }
 }
