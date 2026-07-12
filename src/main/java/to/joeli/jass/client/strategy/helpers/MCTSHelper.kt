@@ -70,7 +70,7 @@ class MCTSHelper(private val mctsConfig: MCTSConfig) {
      */
     @Throws(MCTSException::class)
     fun predictMove(availableCards: Set<Card>, gameSession: GameSession, isChoosingTrumpf: Boolean, shifted: Boolean): Move? {
-        val jassBoard: Board
+        val jassBoard: JassBoard
         val scoreEstimator: ScoreEstimator?
         val cardsEstimator: CardsEstimator?
         val pgxEstimator: PgxPolicyValueEstimator?
@@ -88,6 +88,7 @@ class MCTSHelper(private val mctsConfig: MCTSConfig) {
             pgxEstimator = gameSession.currentGame.currentPlayer.pgxEstimator
             jassBoard = JassBoard.constructCardSelectionJassBoard(availableCards, gameSession.currentGame, mctsConfig.cheating, mctsConfig.hardPruningEnabled, mctsConfig.trumpConditionedDeterminization, scoreEstimator, cardsEstimator, pgxEstimator)
         }
+        jassBoard.setTrueWorldFraction(mctsConfig.trueWorldFraction)
 
         var numDeterminizations = computeNumDeterminizations(gameSession, isChoosingTrumpf, strengthLevel.numDeterminizationsFactor)
 
@@ -119,6 +120,8 @@ class MCTSHelper(private val mctsConfig: MCTSConfig) {
         }
         if (mctsConfig.cheating)
             logger.info("Knowing all the hidden cards --> cheating player")
+        if (mctsConfig.trueWorldFraction > 0.0)
+            logger.info("Oracle mixture: keeping the true hidden hands in {}% of determinizations", mctsConfig.trueWorldFraction * 100)
         if (mctsConfig.hardPruningEnabled)
             logger.info("Hard pruning is enabled")
 

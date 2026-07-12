@@ -12,6 +12,12 @@ class MCTSConfig {
     var cardStrengthLevel = StrengthLevel.POWERFUL
 
     var cheating = false // enable this for comparing the cards estimator performance to a player who knows all the cards
+
+    // Oracle-mixture dose-response (pgx log 2026-07-12): each determinization keeps the TRUE
+    // hidden hands with this probability instead of sampling a world. 0.0 = fair (default),
+    // 1.0 ~ cheating; intermediate values map belief quality to playing strength.
+    var trueWorldFraction = 0.0
+
     var hardPruningEnabled = false // enable this for hard pruning cards to focus more on promising areas of the tree
 
     // At round 0, reject card-play determinizations whose forehand hand is inconsistent with the
@@ -95,7 +101,7 @@ class MCTSConfig {
     }
 
     override fun toString(): String {
-        return "MCTSConfig(runMode=$runMode, trumpfStrengthLevel=$trumpfStrengthLevel, cardStrengthLevel=$cardStrengthLevel, cheating=$cheating, hardPruningEnabled=$hardPruningEnabled, seed=$seed, scoreBoundsUsed=$scoreBoundsUsed, explorationConstant=$explorationConstant, pessimisticBias=$pessimisticBias, optimisticBias=$optimisticBias, numPlayouts=$numPlayouts, finalSelectionPolicy=$finalSelectionPolicy, heuristicFunction=$heuristicFunction, playoutSelectionPolicy=$playoutSelectionPolicy)"
+        return "MCTSConfig(runMode=$runMode, trumpfStrengthLevel=$trumpfStrengthLevel, cardStrengthLevel=$cardStrengthLevel, cheating=$cheating, trueWorldFraction=$trueWorldFraction, hardPruningEnabled=$hardPruningEnabled, seed=$seed, scoreBoundsUsed=$scoreBoundsUsed, explorationConstant=$explorationConstant, pessimisticBias=$pessimisticBias, optimisticBias=$optimisticBias, numPlayouts=$numPlayouts, finalSelectionPolicy=$finalSelectionPolicy, heuristicFunction=$heuristicFunction, playoutSelectionPolicy=$playoutSelectionPolicy)"
     }
 
 

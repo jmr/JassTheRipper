@@ -38,6 +38,10 @@ public class JassBoard implements Board {
 	private boolean shifted;
 	private Game game;
 	private boolean cheating; // Determines if the player knows the cards of the other players or not (used for experiments)
+	// Oracle-mixture dose-response (pgx log 2026-07-12): each determinization keeps the TRUE
+	// hidden hands with this probability instead of sampling. 0.0 = fair (default);
+	// cheating is the 1.0 endpoint. Set post-construction (like trumpfNumCandidates).
+	private double trueWorldFraction = 0.0;
 	private boolean hardPruningEnabled; // Determines if the player knows the cards of the other players or not (used for experiments)
 	private boolean trumpConditionedDeterminization; // At round 0, reject samples inconsistent with the shift/no-shift action.
 	private int trumpfNumCandidates = TrumpfSelectionHelper.TOP_NUM_TRUMPFS;
@@ -125,8 +129,27 @@ public class JassBoard implements Board {
 	}
 
 
+	public void setTrueWorldFraction(double trueWorldFraction) {
+		if (trueWorldFraction < 0.0 || trueWorldFraction > 1.0) {
+			throw new IllegalArgumentException("trueWorldFraction must be in [0,1]: " + trueWorldFraction);
+		}
+		this.trueWorldFraction = trueWorldFraction;
+	}
+
+	/**
+	 * Decides per determinization whether to keep the true hidden hands (cheating, or the
+	 * oracle-mixture coin) instead of sampling a world.
+	 */
+	private boolean keepTrueWorld() {
+		if (cheating) {
+			return true;
+		}
+		return trueWorldFraction > 0.0
+				&& java.util.concurrent.ThreadLocalRandom.current().nextDouble() < trueWorldFraction;
+	}
+
 	void sampleCardDeterminizationToPlayersInTrumpfSelection() {
-		if (!cheating) // if cheating: do nothing -> all the cards are known
+		if (!keepTrueWorld()) // true world kept: do nothing -> all the cards are known
 			CardKnowledgeBase.sampleCardDeterminizationToPlayers(this.gameSession, this.availableCards, this.shifted);
 		else
 			try {
@@ -140,7 +163,7 @@ public class JassBoard implements Board {
 	 * This method should only be called when we want to distribute new cards to the players
 	 */
 	void sampleCardDeterminizationToPlayersInCardPlay() {
-		if (!cheating) // if cheating: do nothing -> all the cards are known
+		if (!keepTrueWorld()) // true world kept: do nothing -> all the cards are known
 			CardKnowledgeBase.sampleCardDeterminizationToPlayers(this.game, this.availableCards, cardsEstimator, trumpConditionedDeterminization);
 		else
 			try {
@@ -172,12 +195,14 @@ public class JassBoard implements Board {
 	public Board duplicate(boolean newRandomCards) {
 		if (isChoosingTrumpf()) {
 			JassBoard jassBoard = constructTrumpfSelectionJassBoard(availableCards, gameSession, shifted, cheating, hardPruningEnabled, scoreEstimator, cardsEstimator, trumpfNumCandidates, pgxEstimator);
+			jassBoard.trueWorldFraction = this.trueWorldFraction;
 			if (newRandomCards)
 				jassBoard.sampleCardDeterminizationToPlayersInTrumpfSelection();
 			return jassBoard;
 		}
 
 		JassBoard jassBoard = constructCardSelectionJassBoard(availableCards, game, cheating, hardPruningEnabled, trumpConditionedDeterminization, scoreEstimator, cardsEstimator, pgxEstimator);
+		jassBoard.trueWorldFraction = this.trueWorldFraction;
 		if (newRandomCards)
 			jassBoard.sampleCardDeterminizationToPlayersInCardPlay();
 		return jassBoard;

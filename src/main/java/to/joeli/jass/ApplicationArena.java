@@ -47,6 +47,12 @@ import java.util.Map;
  *                              (with --pgx-raw1: a single forward pass on the true state, the
  *                              exact pgx-internal raw config; diagnostic only, not a fair player)
  *   --cheating2                Same for team 1
+ *   --true-world-frac1=&lt;q&gt;     Oracle-mixture dose-response (pgx log 2026-07-12): each of team
+ *                              0's search determinizations keeps the TRUE hidden hands with
+ *                              probability q instead of sampling a world. q in [0,1]; 0 = fair,
+ *                              1.0 ~ --cheating1 (rejected together; also rejected with
+ *                              --pgx-raw1, which runs no search). Diagnostic only.
+ *   --true-world-frac2=&lt;q&gt;     Same for team 1
  *   --pgx-model1=&lt;path&gt;        Load pgx SavedModel for team 0 and use value head as MCTS leaf
  *   --pgx-model2=&lt;path&gt;        Load pgx SavedModel for team 1 and use value head as MCTS leaf
  *   --pgx-policy1              Also use policy head as PUCT prior for team 0 (enables PUCT)
@@ -130,6 +136,23 @@ public class ApplicationArena {
 			mc.setTrumpConditionedDeterminization(true);
 		if (flags.containsKey("cheating" + suffix))
 			mc.setCheating(true);
+		if (flags.containsKey("true-world-frac" + suffix)) {
+			if (flags.containsKey("cheating" + suffix)) {
+				throw new IllegalArgumentException("--true-world-frac" + suffix
+						+ " conflicts with --cheating" + suffix + " (cheating IS the 1.0 endpoint)");
+			}
+			if (flags.containsKey("pgx-raw" + suffix)) {
+				throw new IllegalArgumentException("--true-world-frac" + suffix
+						+ " has no effect with --pgx-raw" + suffix
+						+ " (the mixture only changes search determinizations)");
+			}
+			double frac = Double.parseDouble(flags.get("true-world-frac" + suffix));
+			if (frac < 0.0 || frac > 1.0) {
+				throw new IllegalArgumentException("--true-world-frac" + suffix
+						+ " must be in [0,1]: " + frac);
+			}
+			mc.setTrueWorldFraction(frac);
+		}
 
 		Config config = new Config(mc);
 		if (flags.containsKey("pgx-model" + suffix)) {
