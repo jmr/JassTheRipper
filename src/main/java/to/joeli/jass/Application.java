@@ -46,7 +46,10 @@ import java.util.concurrent.Future;
  *   --puct-prior=light|heavy|pgx which playout-selection heuristic to use as the PUCT prior (default: heavy; pgx requires --pgx-model).
  *   --puct-alpha=&lt;value&gt; PUCT prior weight on heuristic-best move (default: 0.7).
  *   --puct-c=&lt;value&gt; PUCT exploration constant (default: 100.0).
+ *   --pgx-trump select trump by argmax of the pgx policy head (requires --pgx-model).
  *   --timeout=&lt;minutes&gt; WebSocket close timeout in minutes (default: 720 = 12h).
+ *   --human start 3 bots and leave one slot open for a human player (all flags above apply
+ *   to all 3 bots).
  */
 public class Application {
 	private static final String BOT_NAME = "JassTheRipper";
@@ -60,23 +63,6 @@ public class Application {
 
 		String url = flags.getOrDefault("url", LOCAL_URL);
 
-		if (flags.containsKey("human")) {
-			MCTSConfig humanMctsConfig = flags.containsKey("strength")
-					? new MCTSConfig(StrengthLevel.valueOf(flags.get("strength")))
-					: new MCTSConfig();
-			logger.info("Human mode: starting 3 bots at strength {}, leaving one slot for a human player.",
-					humanMctsConfig.getCardStrengthLevel());
-			startHumanGame(url, humanMctsConfig);
-			return;
-		}
-
-		String name = flags.getOrDefault("name", BOT_NAME);
-		int team = Integer.parseInt(flags.getOrDefault("team", "1"));
-
-		logger.info("Connecting... Server socket URL: {}", url);
-
-		String session = flags.getOrDefault("session", "Java Client Session");
-		String advisedPlayer = flags.getOrDefault("advised-player", null);
 		MCTSConfig mctsConfig = flags.containsKey("strength")
 				? new MCTSConfig(StrengthLevel.valueOf(flags.get("strength")))
 				: new MCTSConfig();
@@ -123,21 +109,31 @@ public class Application {
 			config.setPgxValueUsed(true);
 		if (flags.containsKey("pgx-policy"))
 			config.setPgxPolicyUsed(true);
-
-		JassTheRipperJassStrategy strategy = new JassTheRipperJassStrategy(config);
-
-		if (flags.containsKey("cards-estimator")) {
-			int episode = Integer.parseInt(flags.get("cards-estimator"));
-			strategy.getCardsEstimator().loadModel(episode);
-			logger.info("Loaded cards estimator from episode {}", episode);
+		if (flags.containsKey("pgx-trump")) {
+			if (pgxEstimator == null)
+				throw new IllegalArgumentException("--pgx-trump requires --pgx-model");
+			config.setPgxTrumpUsed(true);
 		}
-		if (pgxEstimator != null) {
-			strategy.setPgxEstimator(pgxEstimator);
-			if (flags.containsKey("pgx-value"))
-				logger.info("Enabled pgx value head as MCTS leaf evaluator");
-			if (flags.containsKey("pgx-policy"))
-				logger.info("Enabled pgx policy head for PUCT prior");
+
+		Integer cardsEstimatorEpisode = flags.containsKey("cards-estimator")
+				? Integer.parseInt(flags.get("cards-estimator")) : null;
+
+		if (flags.containsKey("human")) {
+			logger.info("Human mode: starting 3 bots at strength {}, leaving one slot for a human player.",
+					mctsConfig.getCardStrengthLevel());
+			startHumanGame(url, config, pgxEstimator, cardsEstimatorEpisode);
+			return;
 		}
+
+		String name = flags.getOrDefault("name", BOT_NAME);
+		int team = Integer.parseInt(flags.getOrDefault("team", "1"));
+
+		logger.info("Connecting... Server socket URL: {}", url);
+
+		String session = flags.getOrDefault("session", "Java Client Session");
+		String advisedPlayer = flags.getOrDefault("advised-player", null);
+
+		JassTheRipperJassStrategy strategy = buildStrategy(config, pgxEstimator, cardsEstimatorEpisode);
 
 		int closeTimeoutMin = Integer.parseInt(flags.getOrDefault("timeout", "720"));
 		Player player = new Player(name, strategy);
@@ -147,14 +143,27 @@ public class Application {
 		}
 	}
 
-	private static void startHumanGame(String url, MCTSConfig mctsConfig) {
+	private static JassTheRipperJassStrategy buildStrategy(Config config, PgxPolicyValueEstimator pgxEstimator, Integer cardsEstimatorEpisode) {
+		JassTheRipperJassStrategy strategy = new JassTheRipperJassStrategy(config);
+		if (cardsEstimatorEpisode != null) {
+			strategy.getCardsEstimator().loadModel(cardsEstimatorEpisode);
+			logger.info("Loaded cards estimator from episode {}", cardsEstimatorEpisode);
+		}
+		if (pgxEstimator != null) {
+			strategy.setPgxEstimator(pgxEstimator);
+		}
+		return strategy;
+	}
+
+	private static void startHumanGame(String url, Config config, PgxPolicyValueEstimator pgxEstimator, Integer cardsEstimatorEpisode) {
 		ExecutorService executorService = Executors.newFixedThreadPool(3);
 		List<Future<?>> futures = new ArrayList<>();
 		int[] teamIndices = {0, 1, 1};
 		for (int teamIndex : teamIndices) {
 			final int ti = teamIndex;
 			futures.add(executorService.submit(() -> {
-				new RemoteGame(url, new Player(BOT_NAME, new JassTheRipperJassStrategy(new Config(mctsConfig))), SessionType.SINGLE_GAME, "Java Client Session", ti, null, 720).start();
+				JassTheRipperJassStrategy strategy = buildStrategy(config, pgxEstimator, cardsEstimatorEpisode);
+				new RemoteGame(url, new Player(BOT_NAME, strategy), SessionType.SINGLE_GAME, "Java Client Session", ti, null, 720).start();
 			}));
 			try {
 				Thread.sleep(500);
