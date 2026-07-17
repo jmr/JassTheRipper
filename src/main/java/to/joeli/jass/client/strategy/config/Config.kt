@@ -29,6 +29,17 @@ class Config {
     var isPgxTrumpUsed = false
     /** Path to the pgx TF2 SavedModel directory; null means pgx is disabled. */
     var pgxModelPath: String? = null
+    /**
+     * Path to the belief likelihood net's SavedModel (gen-11hc); null disables
+     * belief-weighted determinization. When set, each card decision runs the
+     * particle filter (PgxBeliefFilter) and MCTS root determinizations are drawn
+     * ∝ the belief weights instead of uniformly (pgx log 2026-07-17).
+     */
+    var pgxBeliefModelPath: String? = null
+    /** N candidate worlds per decision for the belief particle filter (pgx gate: 32). */
+    var beliefParticles = 32
+    /** λ share of uniform mixed into the belief weights — degenerate-likelihood guard (pgx gate: 0). */
+    var beliefMixUniform = 0.0
 
     // TODO MCTS still does not like to shift by itself. It is forced to shift now because of the rule-based pruning
     //  --> Investigate why MCTS without pruning does not like shifting

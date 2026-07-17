@@ -166,6 +166,16 @@ public class Player implements Comparable<Player> {
 		((JassTheRipperJassStrategy) jassStrategy).setPgxEstimator(pgxEstimator);
 	}
 
+	public PgxPolicyValueEstimator getPgxBeliefEstimator() {
+		if (!(jassStrategy instanceof JassTheRipperJassStrategy)) throw new AssertionError();
+		return ((JassTheRipperJassStrategy) jassStrategy).getPgxBeliefEstimator();
+	}
+
+	public void setPgxBeliefEstimator(PgxPolicyValueEstimator pgxBeliefEstimator) {
+		if (!(jassStrategy instanceof JassTheRipperJassStrategy)) throw new AssertionError();
+		((JassTheRipperJassStrategy) jassStrategy).setPgxBeliefEstimator(pgxBeliefEstimator);
+	}
+
 	public Move makeMove(GameSession session) {
 		if (cards.isEmpty()) throw new RuntimeException("Cannot play a card without cards in deck");
 		final Card cardToPlay = chooseCardWithFallback(session);

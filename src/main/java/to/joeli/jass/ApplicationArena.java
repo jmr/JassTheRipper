@@ -67,6 +67,23 @@ import java.util.Map;
  *                              card method (MCTS/PUCT/raw). Needs --pgx-model1; trumpfStrength
  *                              only sets numDeterminizationsFactor.
  *   --pgx-trump2               Same for team 1 (needs --pgx-model2)
+ *   --pgx-belief1=&lt;path&gt;       Belief-weighted determinization for team 0 (pgx log 2026-07-17):
+ *                              at each card decision, sample N void-consistent candidate worlds,
+ *                              weight each by the hc likelihood net's probability of the
+ *                              opponents' observed moves so far, and draw the MCTS root
+ *                              determinizations with replacement ∝ the weights (duplicates ARE
+ *                              the belief mass — no dedup, no true-world injection). &lt;path&gt; =
+ *                              SavedModel of the likelihood net (gen-11hc), loaded separately
+ *                              from --pgx-model1 (the search net). Card play only; trumpf-phase
+ *                              determinizations stay uniform (no card history yet). Fair by
+ *                              construction: the filter reads only public information. Needs
+ *                              --pgx-model1; rejected with --pgx-raw1 (no search), --cheating1
+ *                              and --true-world-frac1 (oracle knobs would override the belief).
+ *   --pgx-belief2=&lt;path&gt;       Same for team 1
+ *   --belief-particles1=&lt;n&gt;    Candidate worlds per decision for team 0 (default 32, the pgx gate config)
+ *   --belief-particles2=&lt;n&gt;    Same for team 1
+ *   --belief-mix1=&lt;λ&gt;          Uniform share mixed into team 0's belief weights (default 0)
+ *   --belief-mix2=&lt;λ&gt;          Same for team 1
  *
  * --pgx-rawN replaces MCTS for card play. Per-team search flags on a raw team are
  * REJECTED (they would be silently ignored): --scalingN, --ucbN, --puct*N,
@@ -179,6 +196,28 @@ public class ApplicationArena {
 			if (!flags.containsKey("pgx-model" + suffix))
 				throw new IllegalArgumentException("--pgx-trump" + suffix + " requires --pgx-model" + suffix);
 			config.setPgxTrumpUsed(true);
+		}
+		if (flags.containsKey("pgx-belief" + suffix)) {
+			if (!flags.containsKey("pgx-model" + suffix))
+				throw new IllegalArgumentException("--pgx-belief" + suffix + " requires --pgx-model" + suffix);
+			if (flags.containsKey("pgx-raw" + suffix))
+				throw new IllegalArgumentException("--pgx-belief" + suffix
+						+ " has no effect with --pgx-raw" + suffix + " (raw play skips the search determinizations)");
+			if (flags.containsKey("cheating" + suffix) || flags.containsKey("true-world-frac" + suffix))
+				throw new IllegalArgumentException("--pgx-belief" + suffix
+						+ " conflicts with --cheating" + suffix + "/--true-world-frac" + suffix
+						+ " (the oracle knobs would override the belief draw)");
+			config.setPgxBeliefModelPath(flags.get("pgx-belief" + suffix));
+		}
+		if (flags.containsKey("belief-particles" + suffix)) {
+			if (!flags.containsKey("pgx-belief" + suffix))
+				throw new IllegalArgumentException("--belief-particles" + suffix + " requires --pgx-belief" + suffix);
+			config.setBeliefParticles(Integer.parseInt(flags.get("belief-particles" + suffix)));
+		}
+		if (flags.containsKey("belief-mix" + suffix)) {
+			if (!flags.containsKey("pgx-belief" + suffix))
+				throw new IllegalArgumentException("--belief-mix" + suffix + " requires --pgx-belief" + suffix);
+			config.setBeliefMixUniform(Double.parseDouble(flags.get("belief-mix" + suffix)));
 		}
 		return config;
 	}

@@ -145,6 +145,43 @@ public class PgxPolicyValueEstimator {
         }
     }
 
+    /**
+     * Runs one batched forward pass and returns the raw action logits, one row of 43 per
+     * input. Used by the belief particle filter ({@link
+     * to.joeli.jass.client.strategy.helpers.PgxBeliefFilter}), which scores all candidate
+     * worlds of one trajectory step in a single session call instead of {@code rows.length}
+     * batch-1 calls.
+     *
+     * @param rows encoded features, one per candidate world
+     * @return {@code [rows.length][43]} raw (unmasked) action logits
+     */
+    public float[][] forwardLogitsBatch(PgxFeatureEncoder.Features[] rows) {
+        if (!isLoaded()) {
+            throw new IllegalStateException(
+                    "PgxPolicyValueEstimator: model not loaded. Call loadModel() first.");
+        }
+        if (rows.length == 0) {
+            throw new IllegalArgumentException("forwardLogitsBatch: empty batch");
+        }
+
+        float[][][] cmBatch = new float[rows.length][][];
+        float[][] hdBatch = new float[rows.length][];
+        for (int i = 0; i < rows.length; i++) {
+            cmBatch[i] = rows[i].cardMatrix;
+            hdBatch[i] = rows[i].header;
+        }
+
+        try (TFloat32 cmTensor = TFloat32.tensorOf(StdArrays.ndCopyOf(cmBatch));
+             TFloat32 hdTensor = TFloat32.tensorOf(StdArrays.ndCopyOf(hdBatch));
+             Result results = servingFn.call(
+                     Map.of("cm", cmTensor, "hd", hdTensor))) {
+
+            TFloat32 logitsTensor = (TFloat32) results.get("logits")
+                    .orElseThrow(() -> new IllegalStateException("No 'logits' output from model"));
+            return StdArrays.array2dCopyOf(logitsTensor);
+        }
+    }
+
     // ── Value head ────────────────────────────────────────────────────────────
 
     /**

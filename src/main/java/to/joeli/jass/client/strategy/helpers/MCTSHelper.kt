@@ -90,6 +90,23 @@ class MCTSHelper(private val mctsConfig: MCTSConfig) {
         }
         jassBoard.setTrueWorldFraction(mctsConfig.trueWorldFraction)
 
+        if (!isChoosingTrumpf) {
+            val currentPlayer = gameSession.currentGame.currentPlayer
+            val beliefEstimator = currentPlayer.pgxBeliefEstimator
+            if (beliefEstimator != null) {
+                val playerConfig = currentPlayer.config
+                val belief = PgxBeliefFilter(
+                        beliefEstimator::forwardLogitsBatch,
+                        playerConfig.beliefParticles,
+                        playerConfig.beliefMixUniform)
+                        .computeBelief(gameSession.currentGame, availableCards, cardsEstimator,
+                                mctsConfig.trumpConditionedDeterminization)
+                jassBoard.setBeliefWorlds(belief.worlds, belief.weights)
+                logger.info("Belief-weighted determinization: N={} worlds, ESS={}",
+                        belief.worlds.size, String.format("%.2f", belief.effectiveSampleSize()))
+            }
+        }
+
         var numDeterminizations = computeNumDeterminizations(gameSession, isChoosingTrumpf, strengthLevel.numDeterminizationsFactor)
 
         val roundNumber = if (isChoosingTrumpf) 0 else gameSession.currentRound!!.roundNumber

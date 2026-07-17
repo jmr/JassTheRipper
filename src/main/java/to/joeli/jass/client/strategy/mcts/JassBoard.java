@@ -45,6 +45,13 @@ public class JassBoard implements Board {
 	private boolean hardPruningEnabled; // Determines if the player knows the cards of the other players or not (used for experiments)
 	private boolean trumpConditionedDeterminization; // At round 0, reject samples inconsistent with the shift/no-shift action.
 	private int trumpfNumCandidates = TrumpfSelectionHelper.TOP_NUM_TRUMPFS;
+	// Belief-weighted determinization (pgx log 2026-07-17): pre-sampled candidate worlds
+	// (seat-indexed hands) and cumulative weights. When set, each determinization draws a
+	// world with replacement ∝ weights instead of sampling uniformly — duplicated root
+	// worlds ARE the belief mass, so there is no deduplication. Shared by reference
+	// across duplicate() copies.
+	private List<List<Set<Card>>> beliefWorlds;
+	private double[] beliefCumWeights;
 
 	// The neural network of the player choosing the move at the beginning. If null -> use random playout instead
 	private final ScoreEstimator scoreEstimator;
@@ -162,8 +169,49 @@ public class JassBoard implements Board {
 	/**
 	 * This method should only be called when we want to distribute new cards to the players
 	 */
+	/**
+	 * Installs the belief filter's output ({@link to.joeli.jass.client.strategy.helpers.PgxBeliefFilter}):
+	 * card-play determinizations will draw a world with replacement ∝ {@code weights}
+	 * instead of sampling uniformly. Card-play boards only; incompatible with the
+	 * oracle knobs (cheating / trueWorldFraction), which would silently override it.
+	 */
+	public void setBeliefWorlds(List<List<Set<Card>>> worlds, double[] weights) {
+		if (isChoosingTrumpf())
+			throw new IllegalStateException("Belief-weighted determinization is card-play only");
+		if (cheating || trueWorldFraction > 0.0)
+			throw new IllegalStateException(
+					"Belief-weighted determinization conflicts with cheating/trueWorldFraction");
+		if (worlds.isEmpty() || worlds.size() != weights.length)
+			throw new IllegalArgumentException(
+					"Belief worlds/weights mismatch: " + worlds.size() + " vs " + weights.length);
+		double[] cum = new double[weights.length];
+		double sum = 0.0;
+		for (int i = 0; i < weights.length; i++) {
+			if (weights[i] < 0.0) throw new IllegalArgumentException("Negative belief weight: " + weights[i]);
+			sum += weights[i];
+			cum[i] = sum;
+		}
+		if (Math.abs(sum - 1.0) > 1e-6)
+			throw new IllegalArgumentException("Belief weights must sum to 1, got " + sum);
+		this.beliefWorlds = worlds;
+		this.beliefCumWeights = cum;
+	}
+
+	/** Draws one world index with replacement ∝ the belief weights. */
+	private int drawBeliefWorldIndex() {
+		double u = java.util.concurrent.ThreadLocalRandom.current().nextDouble()
+				* beliefCumWeights[beliefCumWeights.length - 1];
+		int idx = java.util.Arrays.binarySearch(beliefCumWeights, u);
+		if (idx < 0) idx = -idx - 1;
+		return Math.min(idx, beliefWorlds.size() - 1);
+	}
+
 	void sampleCardDeterminizationToPlayersInCardPlay() {
-		if (!keepTrueWorld()) // true world kept: do nothing -> all the cards are known
+		if (beliefWorlds != null) {
+			List<Set<Card>> hands = beliefWorlds.get(drawBeliefWorldIndex());
+			for (Player player : game.getPlayers())
+				player.setCards(hands.get(player.getSeatId()));
+		} else if (!keepTrueWorld()) // true world kept: do nothing -> all the cards are known
 			CardKnowledgeBase.sampleCardDeterminizationToPlayers(this.game, this.availableCards, cardsEstimator, trumpConditionedDeterminization);
 		else
 			try {
@@ -203,6 +251,8 @@ public class JassBoard implements Board {
 
 		JassBoard jassBoard = constructCardSelectionJassBoard(availableCards, game, cheating, hardPruningEnabled, trumpConditionedDeterminization, scoreEstimator, cardsEstimator, pgxEstimator);
 		jassBoard.trueWorldFraction = this.trueWorldFraction;
+		jassBoard.beliefWorlds = this.beliefWorlds;
+		jassBoard.beliefCumWeights = this.beliefCumWeights;
 		if (newRandomCards)
 			jassBoard.sampleCardDeterminizationToPlayersInCardPlay();
 		return jassBoard;

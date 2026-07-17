@@ -122,6 +122,7 @@ TODO Make new experiments with the improvements so far:
 	private CardsEstimator cardsEstimator = new CardsEstimator(config.isCardsEstimatorTrainable());
 	private ScoreEstimator scoreEstimator = new ScoreEstimator(config.isScoreEstimatorTrainable());
 	private PgxPolicyValueEstimator pgxEstimator = null;
+	private PgxPolicyValueEstimator pgxBeliefEstimator = null;
 
 
 	public static final Logger logger = LoggerFactory.getLogger(JassTheRipperJassStrategy.class);
@@ -405,6 +406,20 @@ TODO Make new experiments with the improvements so far:
 
 	public void setPgxEstimator(PgxPolicyValueEstimator pgxEstimator) {
 		this.pgxEstimator = pgxEstimator;
+	}
+
+	/**
+	 * Returns the belief likelihood net (gen-11hc) if loaded and belief-weighted
+	 * determinization is configured ({@link Config#getPgxBeliefModelPath}); null otherwise.
+	 */
+	public PgxPolicyValueEstimator getPgxBeliefEstimator() {
+		if (config.getPgxBeliefModelPath() != null && pgxBeliefEstimator != null)
+			return pgxBeliefEstimator;
+		return null;
+	}
+
+	public void setPgxBeliefEstimator(PgxPolicyValueEstimator pgxBeliefEstimator) {
+		this.pgxBeliefEstimator = pgxBeliefEstimator;
 	}
 
 	@Override

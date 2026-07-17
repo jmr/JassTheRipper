@@ -159,4 +159,61 @@ public class JassBoardTest {
 		assertEquals("duplicate(false) in trumpf selection must preserve the determinization, not re-randomize",
 				handsAfterDeterminize, handsAfterTreePolicy);
 	}
+
+	@Test
+	public void testBeliefWorldsAreDrawnByWeight() {
+		Game game = GameSessionBuilder.newSession().withStartedGame(Mode.topDown()).createGameSession().getCurrentGame();
+		Set<Card> availableCards = EnumSet.copyOf(game.getCurrentPlayer().getCards());
+
+		// Two candidate worlds: the true hands, and the true hands with two cards swapped
+		// between the current player's opponents. All the weight sits on world 0.
+		List<Set<Card>> world0 = game.getPlayers().stream()
+				.sorted(java.util.Comparator.comparingInt(Player::getSeatId))
+				.map(p -> (Set<Card>) EnumSet.copyOf(p.getCards()))
+				.collect(java.util.stream.Collectors.toList());
+		List<Set<Card>> world1 = new java.util.ArrayList<>();
+		for (Set<Card> hand : world0)
+			world1.add(EnumSet.copyOf(hand));
+		int believerSeat = game.getCurrentPlayer().getSeatId();
+		int seatA = (believerSeat + 1) & 3;
+		int seatB = (believerSeat + 2) & 3;
+		Card cardA = world1.get(seatA).iterator().next();
+		Card cardB = world1.get(seatB).iterator().next();
+		world1.get(seatA).remove(cardA);
+		world1.get(seatA).add(cardB);
+		world1.get(seatB).remove(cardB);
+		world1.get(seatB).add(cardA);
+
+		JassBoard root = JassBoard.constructCardSelectionJassBoard(availableCards, game, false, false, null, null);
+		root.setBeliefWorlds(asList(world0, world1), new double[]{1.0, 0.0});
+
+		for (int i = 0; i < 5; i++) {
+			JassBoard determinized = (JassBoard) root.duplicate(true);
+			List<Set<Card>> hands = determinized.snapshotPlayerCards();
+			Game determinizedGame = determinized.getGame();
+			for (int p = 0; p < hands.size(); p++) {
+				int seatId = determinizedGame.getPlayers().get(p).getSeatId();
+				assertEquals("zero-weight world must never be drawn (seat " + seatId + ")",
+						world0.get(seatId), hands.get(p));
+			}
+		}
+	}
+
+	@Test
+	public void testBeliefWorldsRejectedOnCheatingBoard() {
+		Game game = GameSessionBuilder.newSession().withStartedGame(Mode.topDown()).createGameSession().getCurrentGame();
+		Set<Card> availableCards = EnumSet.copyOf(game.getCurrentPlayer().getCards());
+		List<Set<Card>> world = game.getPlayers().stream()
+				.sorted(java.util.Comparator.comparingInt(Player::getSeatId))
+				.map(p -> (Set<Card>) EnumSet.copyOf(p.getCards()))
+				.collect(java.util.stream.Collectors.toList());
+
+		JassBoard cheatingBoard = JassBoard.constructCardSelectionJassBoard(availableCards, game, true, false, null, null);
+		try {
+			cheatingBoard.setBeliefWorlds(asList(world), new double[]{1.0});
+			fail("setBeliefWorlds must reject a cheating board");
+		} catch (IllegalStateException expected) {
+			// the oracle knob would silently override the belief draw
+		}
+	}
 }

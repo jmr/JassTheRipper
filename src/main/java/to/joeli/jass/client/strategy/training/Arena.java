@@ -225,6 +225,7 @@ public class Arena {
 		// Load pgx estimators before setConfigs so that PgxPlayoutSelectionPolicy can be
 		// installed into MCTSConfig.puctPriorPolicy before MCTSHelper is constructed.
 		PgxPolicyValueEstimator[] estimators = new PgxPolicyValueEstimator[configs.length];
+		PgxPolicyValueEstimator[] beliefEstimators = new PgxPolicyValueEstimator[configs.length];
 		for (int i = 0; i < configs.length; i++) {
 			String pgxPath = configs[i].getPgxModelPath();
 			if (pgxPath != null && (configs[i].isPgxValueUsed() || configs[i].isPgxPolicyUsed() || configs[i].isPgxRawPlayUsed() || configs[i].isPgxTrumpUsed())) {
@@ -236,15 +237,21 @@ public class Arena {
 							new PgxPlayoutSelectionPolicy(estimators[i]));
 				}
 			}
+			String beliefPath = configs[i].getPgxBeliefModelPath();
+			if (beliefPath != null) {
+				beliefEstimators[i] = new PgxPolicyValueEstimator();
+				beliefEstimators[i].loadModel(beliefPath);
+			}
 		}
 
 		gameSession.setConfigs(configs);  // MCTSHelpers created here; see puctPriorPolicy above
 
 		for (int i = 0; i < configs.length; i++) {
-			if (estimators[i] != null) {
-				for (Player player : gameSession.getPlayersOfTeam(i)) {
+			for (Player player : gameSession.getPlayersOfTeam(i)) {
+				if (estimators[i] != null)
 					player.setPgxEstimator(estimators[i]);
-				}
+				if (beliefEstimators[i] != null)
+					player.setPgxBeliefEstimator(beliefEstimators[i]);
 			}
 		}
 		try {
