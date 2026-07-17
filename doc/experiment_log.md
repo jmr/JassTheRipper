@@ -346,6 +346,36 @@ direction is now confirmed on all three backdrops. A dedicated PUCT-vs-PUCT A/B 
 both net card play) was deemed redundant: the deployment-relevant question — does the trump head help
 under search against a strong opponent — is answered decisively here.
 
+### gen-10-ctrl re-calibration (2026-07-17) — above POWERFUL, but ≈ gen-9 head-to-head
+
+Next generation lands (`pv_gen10-ctrl_s128`, the "ctrl" control run), same attention
+architecture (`PolicyValueNet` with `pool_query`, the default since gen-6) — imported with
+no code change (`extract_pv_weights.py` → `export_pv_savedmodel.py`, the `import_pgx_models.sh`
+pipeline). Same real-PUCT calibration protocol as gen-8d_mz / gen-9: SWEEP_64 (64 runs/det),
+`--pgx-policy` on every model side, 250 pairs / 500 games, seed 42. Both the classical-POWERFUL
+anchor and the direct gen-9 head-to-head were run. (gen-11, `pv_gen11hc`, needs changes before
+it will load and is not covered here.)
+
+| matchup | mean_diff/pair | per-game | t | p | sign test | verdict |
+|:--|:--|:--|:--|:--|:--|:--|
+| gen-10-ctrl vs **POWERFUL** (classical) | +12.1 | +6.05 | 4.417 | 0.0000 | 150W-87L-13T, p=0.0001 | gen-10 beats POWERFUL |
+| gen-10-ctrl vs **gen-9** (SWEEP_64) | −4.0 | −2.0 | −1.594 | 0.1122 | 97W-115L-38T, p=0.2429 | wash (nominally gen-9) |
+
+**gen-10-ctrl sits clearly above classical POWERFUL, but is a wash against gen-9 head-to-head —
+no gen-9→gen-10 step.** vs POWERFUL it scores 108.05% (+6.05/game), decisive on both tests
+(sign 150-87-13, p=0.0001; the sign test moves in step with the t-test here, unlike the noisier
+trump A/Bs). But the *direct* paired match against gen-9 is a wash that if anything leans gen-9
+(gen-10 scores 97.51%, −2.0/game, p=0.11; sign 97-115-38, p=0.24).
+
+**The two POWERFUL anchors mislead; the paired head-to-head is authoritative.** Differencing the
+vs-POWERFUL rows (gen-10 +12.1 vs gen-9 +10.1) suggested a +1/game gen-10 edge, but that gap is
+~0.4σ (SE≈2.7/pair each) — noise, and the direct paired test (which cancels deal variance) points
+the *other* way. So gen-10-ctrl ≈ gen-9, no measured improvement. This is the same gen-to-gen
+paired-wash pattern as gen-7→gen-8 (p=0.95), and consistent with the "ctrl" name — a control run,
+not expected to be a step up. Above-POWERFUL standing by generation (each an independent anchor,
+not a clean ladder): gen-6/7 (≈0, tied) → gen-8d_mz (+4.2) → gen-9 (+5.05) → gen-10-ctrl (+6.05);
+the head-to-head says treat gen-9 and gen-10 as tied, not as a +1/game climb.
+
 ## Strength curve: FAST / STRONG / EXTREME vs POWERFUL
 
 Characterises the saturation curve around POWERFUL. All matches are RUNS mode, FLAT
