@@ -376,6 +376,35 @@ not expected to be a step up. Above-POWERFUL standing by generation (each an ind
 not a clean ladder): gen-6/7 (≈0, tied) → gen-8d_mz (+4.2) → gen-9 (+5.05) → gen-10-ctrl (+6.05);
 the head-to-head says treat gen-9 and gen-10 as tied, not as a +1/game climb.
 
+### Belief-weighted determinization external check (2026-07-18) — paired arm NULL, still above POWERFUL
+
+First use of `--pgx-belief` (the gen-11hc particle filter, this commit's feature): pgx's
+internally-promoted belief-weighted PUCT config (log 2026-07-17 over there: +4.1/game internally),
+checked against the two baselines the gen-10-ctrl calibration above motivated. Same protocol
+(SWEEP_64, `--pgx-policy` on net sides, 250 pairs / 500 games, seed 42); team 1 = gen-10 +
+`--pgx-belief1=pv_gen11hc` (N=32, λ=0). The paired belief-off arm is primary — the two POWERFUL
+anchors only resolve ~±1/game (see above).
+
+| matchup | mean_diff/pair | per-game | t | p | sign test | verdict |
+|:--|:--|:--|:--|:--|:--|:--|
+| belief-on vs belief-off gen-10 (paired) | +1.2 | +0.6 | 0.520 | 0.6032 | 89W-84L-77T, p=0.7611 | **NULL** |
+| belief gen-10 vs **POWERFUL** (classical) | +7.0 | +3.5 | 2.418 | 0.0163 | 146W-95L-9T, p=0.0012 | above POWERFUL |
+
+**The pgx-internal +4.1/game does not survive this engine's operator.** Our classical PUCT
+(~2,880 expansions/move, 25–45 root determinizations per move) extracts the same strength from
+gen-10 with uniform world sampling as with belief-weighted sampling — the paired test, which
+cancels deal variance, is a clean null. The vs-POWERFUL anchor (+3.5, nominally below gen-10's
+own +6.05) differs from it by ~1.3σ — anchor noise, consistent with the paired null. Filter
+health was fine (6,701 belief decisions, zero exceptions, ESS median 4.8 — the weighting did
+concentrate), so this is a real transfer failure, not a broken harness. Plausible mechanism:
+at 25–45 root worlds our value-averaging already covers the belief-relevant worlds; collapsing
+them onto ~2–5 effective worlds trades diversity for accuracy this operator doesn't need.
+
+Caveat noted for the record: both arms occasionally (~1/40 games, 12+8 across the two runs) hit
+the pre-existing `getCardsPossibleToPlay` vs `Mode.canPlayCard` disagreement and played a random
+fallback card — far below the resolution of either test, but it's a real (old) engine bug worth
+fixing independently.
+
 ## Strength curve: FAST / STRONG / EXTREME vs POWERFUL
 
 Characterises the saturation curve around POWERFUL. All matches are RUNS mode, FLAT
