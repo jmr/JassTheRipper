@@ -1,39 +1,5 @@
 # TODOs
 
-## Undertrump bug: `validCardsBits` skips the restriction when void in the led suit
-
-**Symptom** (observed 2026-07-18, belief external-check arenas, but predates those changes —
-both arms hit it): ~1 in 40 games, `Player.chooseCardWithFallback` logs
-`Your strategy tried to play an invalid card. Playing random card instead!` even though the
-MCTS-chosen card was in `getCardsPossibleToPlay`'s set. 12+8 occurrences over 2×500 games
-(logs from that run: `/tmp/claude-501/belief_runA_paired.log`, `belief_runB_powerful.log`).
-
-**Reproduction state** (from the 23:58:36 instance in run A): trump ♠, hearts led, ♠Q already
-played into the trick (an earlier player trumped), current player holds
-`[D6, D7, DJ, DK, CQ, S10]` — void in hearts. `getCardsPossibleToPlay` returns **all six**
-cards; playing ♠10 under ♠Q while holding non-trump discards is undertrumping and illegal.
-`Mode.canPlayCard` correctly rejects it (`isHighestTrumpf` path), so Player's final validation
-disagrees with the move generator and plays a random legal card.
-
-**Root cause**: `TrumpfColorMode.validCardsBits` only applies `validStechenTrumpfBits` (the
-undertrump filter) on the can-follow-suit path:
-
-- `roundColorBits != 0` → `roundColorBits | validStechenTrumpfBits(...)` — correct;
-- `roundColorBits == 0` (void in led suit) → `return availableBits` — **wrong**: it should be
-  `playerNonTrumpf | validStechenTrumpfBits(playerTrumpf, playedBits, trumpfMask)`.
-
-`canPlayCard` (the object/bit variants in the same class) already implements the restriction,
-which is exactly why the two disagree. Note the two rule implementations are used by different
-layers: `validCardsBits` feeds `CardSelectionHelper.getCardsPossibleToPlay` → strategy logging,
-`JassBoard.getMoves` (so the MCTS **searches and can prefer the illegal move**, wasting its
-visit mass before the fallback randomizes), and playouts; `canPlayCard` guards the real move in
-`Player`. Long-term the two should share one implementation.
-
-**Fix sketch**: change the void branch as above; regression test with the reproduction state
-(trump ♠, ♥ led, ♠Q played, hand `[D6 D7 DJ DK CQ S10]` → ♠10 excluded, five cards legal), plus
-the boundary cases: higher trump stays legal (♠K over ♠Q), undertrump legal when holding ONLY
-trumps, and the trump-jack exceptions already covered in `validStechenTrumpfBits`.
-
 ## Advisor identity model
 
 `GameHandler.replacePlayerWithAdvisor` (GameHandler.java) overwrites `localPlayer.id` with the

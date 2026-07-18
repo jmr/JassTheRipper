@@ -130,7 +130,12 @@ class TrumpfColorMode extends Mode {
 		if (roundColor == null) return availableBits;
 
 		long roundColorBits = availableBits & CardSet.COLOR_MASKS[roundColor.ordinal()];
-		if (roundColorBits == 0L) return availableBits;
+		if (roundColorBits == 0L) {
+			// Void in the led suit: any non-trump may be discarded, but the undertrump
+			// restriction still applies to the player's trumps (canPlayCard agrees;
+			// returning availableBits here let MCTS search illegal undertrumps).
+			return playerNonTrumpf | validStechenTrumpfBits(playerTrumpf, playedBits, trumpfMask);
+		}
 
 		return roundColorBits | validStechenTrumpfBits(playerTrumpf, playedBits, trumpfMask);
 	}

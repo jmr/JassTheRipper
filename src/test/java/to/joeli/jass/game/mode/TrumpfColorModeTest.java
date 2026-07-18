@@ -5,6 +5,7 @@ import to.joeli.jass.client.game.Game;
 import to.joeli.jass.client.game.Move;
 import to.joeli.jass.client.game.Player;
 import to.joeli.jass.game.cards.Card;
+import to.joeli.jass.game.cards.CardSet;
 import to.joeli.jass.game.cards.Color;
 import org.junit.Test;
 import org.junit.contrib.theories.Theories;
@@ -348,5 +349,76 @@ public class TrumpfColorModeTest {
         Set<Card> played = EnumSet.of(DIAMOND_SIX);
         Set<Card> playerCards = EnumSet.of(HEART_SIX);
         assertTrue(Mode.trump(HEARTS).canPlayCard(HEART_SIX, played, DIAMONDS, playerCards));
+    }
+
+    // ── validCardsBits: undertrump restriction when void in the led suit ─────
+    // Regression for the doc/todo.md bug (observed 2026-07-18): the void branch
+    // returned availableBits wholesale, so undertrumps stayed "possible" and MCTS
+    // could select a move Player.canPlayCard then rejected (random-card fallback).
+
+    /** Runs validCardsBits and asserts it agrees card-by-card with canPlayCard. */
+    private static Set<Card> validCardsCheckedAgainstCanPlayCard(
+            Mode mode, Set<Card> hand, Set<Card> played, Color roundColor) {
+        Set<Card> valid = CardSet.toEnumSet(
+                mode.validCardsBits(CardSet.toBits(hand), CardSet.toBits(played), roundColor));
+        for (Card card : hand) {
+            assertEquals("validCardsBits and canPlayCard disagree on " + card,
+                    valid.contains(card), mode.canPlayCard(card, played, roundColor, hand));
+        }
+        return valid;
+    }
+
+    @Test
+    public void validCardsBits_voidInLedSuit_forbidsUndertrump() {
+        // The arena state that exposed the bug: trump ♠, hearts led, ♠Q already
+        // trumped into the trick, hand void in hearts holding one low trump.
+        Set<Card> hand = EnumSet.of(DIAMOND_SIX, DIAMOND_SEVEN, DIAMOND_JACK,
+                DIAMOND_KING, CLUB_QUEEN, SPADE_TEN);
+        Set<Card> played = EnumSet.of(HEART_SIX, SPADE_QUEEN);
+
+        Set<Card> valid = validCardsCheckedAgainstCanPlayCard(Mode.trump(SPADES), hand, played, HEARTS);
+
+        assertEquals(EnumSet.of(DIAMOND_SIX, DIAMOND_SEVEN, DIAMOND_JACK, DIAMOND_KING, CLUB_QUEEN), valid);
+    }
+
+    @Test
+    public void validCardsBits_voidInLedSuit_allowsOvertrump() {
+        Set<Card> hand = EnumSet.of(DIAMOND_SIX, CLUB_QUEEN, SPADE_KING);
+        Set<Card> played = EnumSet.of(HEART_SIX, SPADE_QUEEN);
+
+        Set<Card> valid = validCardsCheckedAgainstCanPlayCard(Mode.trump(SPADES), hand, played, HEARTS);
+
+        assertEquals(hand, valid);
+    }
+
+    @Test
+    public void validCardsBits_voidInLedSuit_allowsUndertrumpWithOnlyTrumpsInHand() {
+        Set<Card> hand = EnumSet.of(SPADE_SIX, SPADE_TEN);
+        Set<Card> played = EnumSet.of(HEART_SIX, SPADE_QUEEN);
+
+        Set<Card> valid = validCardsCheckedAgainstCanPlayCard(Mode.trump(SPADES), hand, played, HEARTS);
+
+        assertEquals(hand, valid);
+    }
+
+    @Test
+    public void validCardsBits_voidInLedSuit_allowsAnyTrumpWhenNoTrumpPlayedYet() {
+        Set<Card> hand = EnumSet.of(DIAMOND_SIX, SPADE_SIX);
+        Set<Card> played = EnumSet.of(HEART_SIX, HEART_KING);
+
+        Set<Card> valid = validCardsCheckedAgainstCanPlayCard(Mode.trump(SPADES), hand, played, HEARTS);
+
+        assertEquals(hand, valid);
+    }
+
+    @Test
+    public void validCardsBits_voidInLedSuit_trumpfNineOnlyBeatenByJack() {
+        // ♠9 (nell) already played: only the ♠J may still trump; ♠A would undertrump.
+        Set<Card> hand = EnumSet.of(DIAMOND_SIX, SPADE_JACK, SPADE_ACE);
+        Set<Card> played = EnumSet.of(HEART_SIX, SPADE_NINE);
+
+        Set<Card> valid = validCardsCheckedAgainstCanPlayCard(Mode.trump(SPADES), hand, played, HEARTS);
+
+        assertEquals(EnumSet.of(DIAMOND_SIX, SPADE_JACK), valid);
     }
 }
